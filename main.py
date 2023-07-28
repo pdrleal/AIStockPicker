@@ -1,8 +1,7 @@
 from novaims.aistockpicker.welcome import greetings
 
-def __main__():
+def main():
     greetings.hello()
-
 
 if __name__ == "__main__":
     main()
