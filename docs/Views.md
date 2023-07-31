@@ -11,7 +11,7 @@
 		- [Implementation View](#implementation-view)
 		- [Processes View](#processes-view-1)
 		- [Physical View](#physical-view)
-	- [Level 3](#level-3)
+	- [Level 3](#level-3---aistockpicker)
 		- [Logical View](#logical-view-2)
 		- [Implementation View](#implementation-view-1)
 		- [Processes View](#processes-view-2)
@@ -62,12 +62,12 @@ TBD
 ### Physical View
 ![L2_PhysicalView](diagrams/level2/L2_PhysicalView.svg)
 
-## Level 3 
+## Level 3 - AIStockPicker
 ### Logical View
-TBD
+![L3_LogicalView_AIStockPicker](diagrams/level3/L3_LogicalView_AIStockPicker.svg)
 
 ### Implementation View
-TBD
+![L3_ImplementationView](diagrams/level3/L3_ImplementationView_AIStockPicker.svg)
 ### Processes View
 TBD
 
