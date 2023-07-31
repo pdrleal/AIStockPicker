@@ -1,4 +1,4 @@
-from novaims.aistockpicker.welcome import greetings
+from welcome import greetings
 
 def main():
     greetings.hello()
