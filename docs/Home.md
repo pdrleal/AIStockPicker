@@ -10,7 +10,8 @@ This SAD is consists of:
 - [Architecture Background](Background.md)
 - [Views](Views.md)
 - [Mapping Between Views](Mapping.md)
+- [Domain Driven Design Model](diagrams/DomainDrivenDesign.md)
 - [Referenced Materials](References.md)
-- [Glossary and Acronyms](Gloassary&Acronyms.md)
+- [Glossary and Acronyms](Glossary&Acronyms.md)
 
 NB: This SAD is based on [Software+Architecture+Documentation+Template](https://wiki.sei.cmu.edu/confluence/display/SAD/Software+Architecture+Documentation+Template)
