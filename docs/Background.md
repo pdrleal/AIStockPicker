@@ -42,6 +42,7 @@ With its potential to revolutionize investment strategies, this research has far
 > This section lists the functional requirements, quality attributes and design constraints. It may point to a separate requirements document.
 
 #### Functional requirements
+1. As an user, I want to refresh the data available in the database with more recent one.
 1. As an user, I want to obtain a company stock value forecast, providing me insights into potential stock trends.
 2. As a user, I want the system to generate personalized portfolio recommendations that align with my investment preferences and risk tolerance, in order to help make informed investment decisions.
 3. As an admin, I want to easily configure and update the constants without affecting the overall system functionality.

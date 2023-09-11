@@ -47,8 +47,6 @@ To visually model/represent both what has been implemented and the ideas and alt
 ### Logical View
 ![L1_LogicalView](diagrams/level1/L1_LogicalView.svg)
 
-### Processes View
-TBD
 
 ## Level 2
 ### Logical View
@@ -58,6 +56,7 @@ TBD
 ![L2_LogicalView](diagrams/level2/L2_ImplementationView.svg)
 ### Processes View
 TBD
+
 
 ### Physical View
 ![L2_PhysicalView](diagrams/level2/L2_PhysicalView.svg)
@@ -69,7 +68,10 @@ TBD
 ### Implementation View
 ![L3_ImplementationView](diagrams/level3/L3_ImplementationView_AIStockPicker.svg)
 ### Processes View
-TBD
+
+Sequence Diagram - Refresh Data Use Case
+
+![L3_SD_RefreshData](diagrams/level3/L3_SD_RefreshData.svg)
 
 
 
