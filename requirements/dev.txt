@@ -6,4 +6,6 @@ watchdog
 flake8
 Sphinx
 dependency_injector
+pandas
+numpy
 

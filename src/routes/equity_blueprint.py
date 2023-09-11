@@ -3,11 +3,11 @@ from dependency_injector.wiring import inject, Provide
 from application.dependency_container import DependencyContainer
 from src.interfaceadapters.controllers.icontrollers.iequity_controller import IEquityController
 
-blueprint = Blueprint('equity', __name__)
+blueprint = Blueprint('refresh', __name__)
 
 
-@blueprint.route("/equities", methods=["GET"])
+@blueprint.route("/refresh", methods=["GET"])
 @inject
-def get_equities_blueprint(controller: IEquityController=Provide[DependencyContainer.equity_controller]):
-    response = controller.equity_list()
+def refresh_equity_blueprint(controller: IEquityController=Provide[DependencyContainer.equity_controller]):
+    response = controller.refresh_data()
     return response

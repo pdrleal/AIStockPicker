@@ -2,5 +2,5 @@ import abc
 
 class IEquityController(abc.ABC):
     @abc.abstractmethod
-    def equity_list(self):
+    def refresh_data(self):
         pass
