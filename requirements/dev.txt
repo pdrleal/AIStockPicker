@@ -8,4 +8,5 @@ Sphinx
 dependency_injector
 pandas
 numpy
+sqlalchemy
 

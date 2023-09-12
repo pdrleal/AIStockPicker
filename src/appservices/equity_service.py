@@ -8,11 +8,13 @@ from src.appservices.iservices.iequity_service import IEquityService
 class EquityService(IEquityService):
 
     def __init__(self, constants_service: IConstantsService, equity_repo:IEquityRepo, equity_mapper: IEquityMapper):
+        self.constants_service = constants_service
         self.equity_repo = equity_repo
         self.equity_mapper = equity_mapper
 
     def refresh_data(self):
         # map each equity in the repo.get_all() to dto list
+        self.constants_service.stocks_indices()
         equity_dto_list = []
         for equity in self.equity_repo.get_all():
             equity_dto_list.append(self.equity_mapper.map_equity_to_dto(equity))
