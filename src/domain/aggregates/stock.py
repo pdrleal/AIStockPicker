@@ -13,7 +13,7 @@ from src.domain.valueobjects.date_range import DateRange
 
 @dataclasses.dataclass
 
-class Equity:
+class Stock:
     code: uuid.uuid4
     index: Index
     # pandas Series with price history and index as the timestamp
@@ -25,7 +25,7 @@ class Equity:
     def __init__(self, index:str, timestamps:[],price_list: [], news_sentiment_list: [], social_sentiment_list: []):
         if len(price_list) != len(news_sentiment_list) or len(price_list) != \
             len(social_sentiment_list) != len(timestamps):
-            raise ValueError("The length of the equity fields are not equal.")
+            raise ValueError("The length of the stock fields are not equal.")
         
         self.code = uuid.uuid4()
         self.index = Index(index)

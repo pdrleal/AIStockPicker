@@ -1,8 +1,8 @@
-# write equity_dto
+# write stock_dto
 import dataclasses
 
 @dataclasses.dataclass
-class EquityDTO:
+class StockDTO:
     index: str
     date_range: []
     price_list: []

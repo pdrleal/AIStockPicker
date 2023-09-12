@@ -1,13 +1,13 @@
-from src.domain.aggregates.equity import Equity
-from src.appservices.irepositories.iequity_repo import IEquityRepo
+from src.domain.aggregates.stock import Stock
+from src.appservices.irepositories.istock_repo import IStockRepo
 
-class EquityRepo(IEquityRepo):
+class StockRepo(IStockRepo):
     
     def __init__(self):
         pass
       
     def get_all(self):
-        eq1= Equity.from_start_end_dates(
+        eq1= Stock.from_start_end_dates(
             index="AAPL",
             start_date="2021-01-01",
             end_date="2021-01-02",
@@ -15,7 +15,7 @@ class EquityRepo(IEquityRepo):
             news_sentiment_list=[1, 2],
             social_sentiment_list=[1, 2],
         )
-        eq2= Equity.from_start_end_dates(
+        eq2= Stock.from_start_end_dates(
             index="AMZN",
             start_date="2021-01-01",
             end_date="2021-01-02",

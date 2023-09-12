@@ -1,6 +1,6 @@
 import abc
 
-class IEquityController(abc.ABC):
+class IStockController(abc.ABC):
     @abc.abstractmethod
     def refresh_data(self):
         pass
