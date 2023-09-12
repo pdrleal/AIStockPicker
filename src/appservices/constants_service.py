@@ -7,7 +7,5 @@ class ConstantsService(IConstantsService):
         self.constants_repo = constants_repo
 
     def stocks_indices(self):
-        indices= self.constants_repo.stocks_indices()
-        print(indices)
-        return indices
+        return self.constants_repo.stocks_indices()
     
