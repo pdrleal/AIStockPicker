@@ -13,13 +13,25 @@ class EquityService(IEquityService):
         self.equity_mapper = equity_mapper
 
     def refresh_data(self):
+        
+        #retrieve stock indices from constants_service
+        stock_indices=self.constants_service.stocks_indices()
+        
         # map each equity in the repo.get_all() to dto list
-        self.constants_service.stocks_indices()
-        equity_dto_list = []
-        for equity in self.equity_repo.get_all():
-            equity_dto_list.append(self.equity_mapper.map_equity_to_dto(equity))
+        equity_dto_list = list(map(self.equity_mapper.map_equity_to_dto, self.equity_repo.get_all()))
+            
+        #self.perform_refresh(stock_indices, equity_dto_list)
         
         return equity_dto_list
+    
+    #def perform_refresh(self,stock_indices, equity_dto_list):
+    #    for stock_index in stock_indices:
+    #        if stock_index not in equity_dto_list:
+    #            self.equity_repo.call_equity_data(stock_index)
+    #        else:
+    #            self.update_equity(stock_index)
+    #    pass
+
     """
      def get_equity(self, equity_id):
         return self.equity_repository.get_equity_by_id(equity_id)
