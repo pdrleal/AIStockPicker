@@ -2,6 +2,9 @@ from src.domain.aggregates.equity import Equity
 from src.appservices.irepositories.iequity_repo import IEquityRepo
 
 class EquityRepo(IEquityRepo):
+    
+    def __init__(self):
+        pass
       
     def get_all(self):
         eq1= Equity.from_start_end_dates(

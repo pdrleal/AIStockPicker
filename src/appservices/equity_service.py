@@ -1,3 +1,4 @@
+from src.appservices.iservices.iconstants_service import IConstantsService
 from src.dtos.iequity_mapper import IEquityMapper
 from src.domain.aggregates.equity import Equity
 from src.appservices.irepositories.iequity_repo import IEquityRepo
@@ -6,15 +7,15 @@ from src.appservices.iservices.iequity_service import IEquityService
 
 class EquityService(IEquityService):
 
-    def __init__(self, equityrepo:IEquityRepo, equitymapper: IEquityMapper):
-        self.equityrepo = equityrepo
-        self.equitymapper = equitymapper
+    def __init__(self, constants_service: IConstantsService, equity_repo:IEquityRepo, equity_mapper: IEquityMapper):
+        self.equity_repo = equity_repo
+        self.equity_mapper = equity_mapper
 
     def refresh_data(self):
         # map each equity in the repo.get_all() to dto list
         equity_dto_list = []
-        for equity in self.equityrepo.get_all():
-            equity_dto_list.append(self.equitymapper.map_equity_to_dto(equity))
+        for equity in self.equity_repo.get_all():
+            equity_dto_list.append(self.equity_mapper.map_equity_to_dto(equity))
         
         return equity_dto_list
     """

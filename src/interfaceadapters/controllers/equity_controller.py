@@ -10,11 +10,11 @@ from src.interfaceadapters.controllers.icontrollers.iequity_controller import IE
 class EquityController(IEquityController):
     
 
-    def __init__(self, equityservice:IEquityService) -> None:
-        self.equityservice = equityservice
+    def __init__(self, equity_service:IEquityService) -> None:
+        self.equity_service = equity_service
 
     def refresh_data(self):
-        result = self.equityservice.refresh_data()
+        result = self.equity_service.refresh_data()
         #return the response as json
         return Response(json.dumps(result,cls=EnhancedJSONEncoder), mimetype='application/json')
         
