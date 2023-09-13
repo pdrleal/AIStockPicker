@@ -7,6 +7,6 @@ class ConstantsRepo(IConstantsRepo):
         self.conn = sqlite3.connect('database/constants.db')
         self.c = self.conn.cursor()
       
-    def stocks_indices(self):
+    def get_stocks_indices(self):
         self.c.execute("Select stock_index from stock_indices")
         return [x[0] for x in self.c.fetchall()]
