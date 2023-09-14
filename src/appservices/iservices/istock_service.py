@@ -1,7 +1,7 @@
 import abc
-from src.dtos.stock_dto import StockDTO
+from stockstats import StockDataFrame
 
 class IStockService(abc.ABC):
     @abc.abstractmethod
-    def refresh_data(self)->list[StockDTO]:
+    def refresh_data(self)->StockDataFrame:
         pass

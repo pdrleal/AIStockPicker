@@ -1,28 +1,24 @@
 from src.appservices.iservices.iconstants_service import IConstantsService
-from src.dtos.istock_mapper import IStockMapper
-from src.domain.aggregates.stock import Stock
 from src.appservices.irepositories.istock_repo import IStockRepo
 from src.appservices.iservices.istock_service import IStockService
 
 
 class StockService(IStockService):
 
-    def __init__(self, constants_service: IConstantsService, stock_repo:IStockRepo, stock_mapper: IStockMapper):
+    def __init__(self, constants_service: IConstantsService, stock_repo:IStockRepo):
         self.constants_service = constants_service
         self.stock_repo = stock_repo
-        self.stock_mapper = stock_mapper
 
     def refresh_data(self):
-        
         #retrieve stock indices from constants_service
         stock_indices=self.constants_service.stocks_indices()
         
-        # map each stock in the repo.get_all() to dto list
-        stock_dto_list = list(map(self.stock_mapper.map_stock_to_dto, self.stock_repo.get_all()))
+        #retrieve stock data from stock_repo
+        raw_dataframe= self.stock_repo.get_all()
             
         #self.perform_refresh(stock_indices, stock_dto_list)
         
-        return stock_dto_list
+        return raw_dataframe
     
     #def perform_refresh(self,stock_indices, stock_dto_list):
     #    for stock_index in stock_indices:

@@ -1,7 +1,6 @@
 from dependency_injector import containers, providers
 from src.appservices.constants_service import ConstantsService
 from src.interfaceadapters.repositories.constants_repo import ConstantsRepo
-from src.dtos.stock_mapper import StockMapper
 
 from src.interfaceadapters.repositories.stock_repo import StockRepo
 from src.appservices.stock_service import StockService
@@ -23,6 +22,5 @@ class DependencyContainer(containers.DeclarativeContainer):
     constants_service = providers.Factory(ConstantsService,constants_repo=constants_repo)
     
     stock_repo= providers.Factory(StockRepo)
-    stock_mapper= providers.Factory(StockMapper)
-    stock_service = providers.Factory(StockService,constants_service= constants_service, stock_repo=stock_repo,stock_mapper=stock_mapper)
+    stock_service = providers.Factory(StockService,constants_service= constants_service, stock_repo=stock_repo)
     stock_controller = providers.Factory(StockController,stock_service=stock_service)

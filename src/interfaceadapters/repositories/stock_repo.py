@@ -1,4 +1,3 @@
-from src.domain.aggregates.stock import Stock
 from src.appservices.irepositories.istock_repo import IStockRepo
 import influxdb_client
 from influxdb_client import Point

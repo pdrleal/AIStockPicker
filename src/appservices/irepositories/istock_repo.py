@@ -1,10 +1,9 @@
 import abc
-
-from src.domain.aggregates.stock import Stock
+from stockstats import StockDataFrame
 
 class IStockRepo(abc.ABC):
     @abc.abstractmethod
-    def get_all(self)->list[Stock]:
+    def get_all(self)->StockDataFrame:
         pass
     def create_stock(self,):
         pass
