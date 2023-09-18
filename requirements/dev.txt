@@ -10,3 +10,5 @@ pandas
 numpy
 sqlalchemy
 stockstats
+dependency_injector
+python-dotenv
