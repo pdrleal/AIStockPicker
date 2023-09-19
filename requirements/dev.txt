@@ -12,3 +12,4 @@ sqlalchemy
 stockstats
 dependency_injector
 python-dotenv
+pytz
