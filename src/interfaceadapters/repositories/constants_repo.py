@@ -1,12 +1,14 @@
 from src.appservices.irepositories.iconstants_repo import IConstantsRepo
-import sqlite3
+from sqlalchemy import create_engine, text
+
 
 class ConstantsRepo(IConstantsRepo):
-    
+
     def __init__(self):
-        self.conn = sqlite3.connect('database/constants.db')
-        self.c = self.conn.cursor()
-      
+        self.engine = create_engine('sqlite:///database/constants.db')
+
     def get_stocks_indices(self):
-        self.c.execute("Select stock_index from stock_indices")
-        return [x[0] for x in self.c.fetchall()]
+        with self.engine.connect() as conn:
+            result = conn.execute(text("Select stock_index from stock_indices"))
+            stocks_indices = [row[0] for row in result]
+        return stocks_indices

@@ -1,7 +1,7 @@
 import abc
-from stockstats import StockDataFrame
+import pandas as pd
 
 class IStockService(abc.ABC):
     @abc.abstractmethod
-    def refresh_data(self)->StockDataFrame:
+    def refresh_data(self)->pd.DataFrame:
         pass

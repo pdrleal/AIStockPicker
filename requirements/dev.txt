@@ -5,11 +5,12 @@ wheel
 watchdog
 flake8
 Sphinx
+ipykernel
 dependency_injector
 pandas
 numpy
 sqlalchemy
-stockstats
-dependency_injector
+# stockstats
 python-dotenv
 pytz
+PyMySQL
