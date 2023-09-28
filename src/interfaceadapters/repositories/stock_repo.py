@@ -1,14 +1,35 @@
+import pandas as pd
 from sqlalchemy import create_engine
 from src.appservices.irepositories.istock_repo import IStockRepo
+from dotenv import load_dotenv, find_dotenv
+import os
 
 
 class StockRepo(IStockRepo):
-
     def __init__(self):
-        self.engine = create_engine("mysql+mysqlconnector:///root:admin12345678@127.0.0.1:3306")
+        load_dotenv(find_dotenv())
+        user = os.getenv('MYSQL_USER')
+        password = os.getenv('MYSQL_PASSWORD')
+        db_name = os.getenv('MYSQL_DB_NAME')
+        self.engine = create_engine(f"mysql+pymysql://{user}:{password}@localhost:3306/{db_name}")
 
-    def get_all(self):
-        with self.engine.connect() as conn:
-            result = conn.execute("Select * from CLEAN_STOCKS")
-            return result.fetchall()
-        return []
+    def add_landing_stock_prices(self):
+        pass
+
+    def add_landing_news_sentiments(self):
+        pass
+
+    def add_landing_social_sentiments(self):
+        pass
+
+    def get_landing_stock_prices(self) -> pd.DataFrame:
+        return pd.read_sql_table('LANDING_STOCK_VALUES', self.engine)
+
+    def get_landing_news_sentiments(self) -> pd.DataFrame:
+        return pd.read_sql_table('LANDING_NEWS_SENTIMENT', self.engine)
+
+    def get_landing_social_sentiments(self) -> pd.DataFrame:
+        return pd.read_sql_table('LANDING_SOCIAL_MEDIA_SENTIMENT', self.engine)
+
+    def add_batch_clean(self):
+        pass

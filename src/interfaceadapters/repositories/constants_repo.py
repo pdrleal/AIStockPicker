@@ -1,14 +1,20 @@
 from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 from sqlalchemy import create_engine, text
+from dotenv import load_dotenv, find_dotenv
+import os
 
 
 class ConstantsRepo(IConstantsRepo):
 
     def __init__(self):
-        self.engine = create_engine('sqlite:///database/constants.db')
+        load_dotenv(find_dotenv())
+        user = os.getenv('MYSQL_USER')
+        password = os.getenv('MYSQL_PASSWORD')
+        db_name = os.getenv('MYSQL_DB_NAME')
+        self.engine = create_engine(f"mysql+pymysql://{user}:{password}@localhost:3306/{db_name}")
 
     def get_stocks_indices(self):
         with self.engine.connect() as conn:
-            result = conn.execute(text("Select stock_index from stock_indices"))
+            result = conn.execute(text("Select name from STOCK_INDICES"))
             stocks_indices = [row[0] for row in result]
         return stocks_indices

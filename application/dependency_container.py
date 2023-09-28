@@ -17,10 +17,9 @@ def setup_dependency_container(app, modules=None, packages=None):
 class DependencyContainer(containers.DeclarativeContainer):
     config = providers.Configuration()
     wiring_config = containers.WiringConfiguration()
-    
-    constants_repo= providers.Factory(ConstantsRepo)
-    constants_service = providers.Factory(ConstantsService,constants_repo=constants_repo)
-    
-    stock_repo= providers.Factory(StockRepo)
-    stock_service = providers.Factory(StockService,constants_service= constants_service, stock_repo=stock_repo)
-    stock_controller = providers.Factory(StockController,stock_service=stock_service)
+
+    constants_repo = providers.Factory(ConstantsRepo)
+
+    stock_repo = providers.Factory(StockRepo)
+    stock_service = providers.Factory(StockService, constants_repo=constants_repo, stock_repo=stock_repo)
+    stock_controller = providers.Factory(StockController, stock_service=stock_service)
