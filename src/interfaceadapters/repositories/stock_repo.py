@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from src.appservices.irepositories.istock_repo import IStockRepo
 from dotenv import load_dotenv, find_dotenv
 import os
@@ -31,5 +31,9 @@ class StockRepo(IStockRepo):
     def get_landing_social_sentiments(self) -> pd.DataFrame:
         return pd.read_sql_table('LANDING_SOCIAL_MEDIA_SENTIMENT', self.engine)
 
-    def add_batch_clean(self):
-        pass
+    def add_batch_clean(self, clean_df: pd.DataFrame):
+        clean_df.to_sql('CLEAN_DATA', self.engine, if_exists='replace', index=False)
+        # TODO: add primary key
+        # with self.engine.connect() as con:
+        #     con.execute(text('ALTER TABLE CLEAN_DATA ADD PRIMARY KEY(date(255),stock_index(255));'))
+        return True
