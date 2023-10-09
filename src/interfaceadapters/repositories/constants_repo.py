@@ -18,3 +18,9 @@ class ConstantsRepo(IConstantsRepo):
             result = conn.execute(text("Select name from STOCK_INDICES"))
             stocks_indices = [row[0] for row in result]
         return stocks_indices
+
+    def get_by_key(self, key):
+        with self.engine.connect() as conn:
+            result = conn.execute(text("Select value from VARIABLES where `key`=:key"), {"key": key})
+            value = result.first()[0]
+        return value

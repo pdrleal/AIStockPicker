@@ -1,6 +1,11 @@
+from datetime import datetime
 import json
 
 import pandas as pd
+import pytz
+import requests
+from dateutil import rrule
+from dateutil.relativedelta import relativedelta
 
 from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 from src.appservices.irepositories.istock_repo import IStockRepo
@@ -13,6 +18,130 @@ class StockService(IStockService):
         self.constants_repo = constants_repo
         self.stock_repo = stock_repo
         self.stocks_indices = self.constants_repo.get_stocks_indices()
+        self.fetch_frequency = self.constants_repo.get_by_key("Fetch Frequency")
+        self.last_update_date = datetime.datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
+                                                           '%Y-%m-%d %H:%M:%S')
+
+    def refresh_landing_data(self):
+        def get_daily_stock_values(symbol: str, start_date: datetime.date, end_date: datetime.date, interval: str,
+                                   api_key: str):
+            if interval not in {"1min", "5min", "15min", "30min", "60min"}:
+                raise ValueError('Interval must be 1min, 5min, 15min, 30min or 60min')
+
+            # set day as first of month, since values are fetched monthly
+            start_date = start_date.replace(day=1)
+
+            total_count = 0;
+            for _ in rrule.rrule(rrule.MONTHLY, dtstart=start_date, until=end_date):
+                total_count += 1;
+
+            count = 0;
+            # iterate through months to get stock values
+            for date in rrule.rrule(rrule.MONTHLY, dtstart=start_date, until=end_date):
+                year_str = str(date.year)
+                month_str = '{:02d}'.format(date.month)
+                date_str = year_str + "-" + month_str
+                url = "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY" + \
+                      "&apikey={}&symbol={}&interval={}&month={}&outputsize=full&extended_hours=false". \
+                          format(api_key, symbol, interval, date_str)
+                while True:
+                    r = requests.get(url)
+                    # TODO: check if it's the correct way to check if the api key is expired
+                    if r.text != '{\n    "Note": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute and 100 calls per day. Please visit https://www.alphavantage.co/premium/ if you would like to target a higher API call frequency."\n}':
+                        break
+
+                data = r.json()
+                self.stock_repo.add_landing_stock_prices(symbol, date_str, data)
+                count += 1
+                print(f"Stocks prices | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
+
+        def get_daily_news_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date, api_key: str):
+
+            total_count = 0;
+            for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
+                if date.weekday() in [5, 6]:
+                    continue
+                total_count += 1;
+
+            count = 0;
+            # iterate through days to get news sentiment
+            for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
+                if date.weekday() in [5, 6]:
+                    continue
+                else:
+                    time_from = date.strftime("%Y%m%d") + "T0000"
+                    time_to = date.strftime("%Y%m%d") + "T2359"
+                    url = "https://www.alphavantage.co/query?function=NEWS_SENTIMENT" + \
+                          "&apikey={}&tickers={}&time_from={}&time_to={}&sort=RELEVANCY&limit=1000". \
+                              format(api_key, symbol, time_from, time_to)
+                    while True:
+                        r = requests.get(url)
+                        # TODO: check if it's the correct way to check if the api key is expired
+                        if r.text != '{\n    "Note": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute and 100 calls per day. Please visit https://www.alphavantage.co/premium/ if you would like to target a higher API call frequency."\n}':
+                            break
+
+                    data = r.json()
+
+                    date_str = date.strftime("%Y-%m-%d")
+                    self.stock_repo.add_landing_news_sentiments(symbol, date_str, data)
+
+                    count += 1;
+                    print(f"News Sentiment | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
+
+        def get_weekly_social_media_sentiment(symbol: str, start_date: datetime.date, end_date: datetime.date,
+                                              api_key: str):
+
+            # adjust date to monday
+            adjusted_start_date = start_date - datetime.timedelta(days=(start_date.weekday() - 0) % 7)
+
+            total_count = 0
+            for _ in rrule.rrule(rrule.WEEKLY, dtstart=adjusted_start_date, until=end_date):
+                total_count += 1
+
+            count = 0
+
+            # iterate through weeks to get social sentiment
+            for date in rrule.rrule(rrule.WEEKLY, dtstart=adjusted_start_date, until=end_date):
+                # fetch date from monday to saturday
+                from_date_str = str(date.year) + "-" + '{:02d}'.format(date.month) + "-" + '{:02d}'.format(date.day)
+                to_date = date + datetime.timedelta(days=5)
+                to_date_str = str(to_date.year) + "-" + '{:02d}'.format(to_date.month) + "-" + '{:02d}'.format(
+                    to_date.day)
+                url = "https://finnhub.io/api/v1/stock/social-sentiment?" + \
+                      "token={}&symbol={}&from={}&to={}".format(api_key, symbol, from_date_str, to_date_str)
+                while True:
+                    r = requests.get(url)
+                    if r.status_code not in {401, 429}:
+                        break
+
+                data = r.json()
+                self.stock_repo.add_landing_social_sentiments(symbol, from_date_str, to_date_str, data)
+                start_date_str = date.strftime("%Y-%m-%d")
+                end_date_str = to_date.strftime("%Y-%m-%d")
+
+                count += 1
+                print(f"Social Sentiment | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
+
+        if self.last_update_date == "":
+            # start from the beginning - 18 months
+            start_date = datetime.now().date() - relativedelta(months=18)
+        else:
+            # start from the date before the last update date
+            start_date = self.last_update_date.date() - datetime.timedelta(days=1)
+
+        # if market still open, use data from the day before
+        if datetime.now(tz=pytz.timezone('US/Eastern')).hour < 17:
+            end_date = datetime.now().date() - datetime.timedelta(days=1)
+        else:
+            end_date = datetime.now().date()
+
+        alpha_vantage_apikey = self.constants_repo.get_by_key("Alpha Vantage API Key")
+        finnhub_apikey = self.constants_repo.get_by_key("Finnhub API Key")
+        for symbol in self.stocks_indices:
+            get_daily_stock_values(symbol, start_date, end_date, self.fetch_frequency, alpha_vantage_apikey)
+            get_daily_news_sentiments(symbol, start_date, end_date, alpha_vantage_apikey)
+            get_weekly_social_media_sentiment(symbol, start_date, end_date, finnhub_apikey)
+        return True
 
     def clean_landing_data(self):
 
@@ -36,8 +165,8 @@ class StockService(IStockService):
 
             clean_df = pd.concat(df_list)
             clean_df.columns = ["stock_index", "open", "high", "low", "close", "volume"]
-            clean_df.reset_index(inplace=True, drop=False, names="date")
-            clean_df["date"] = pd.to_datetime(clean_df["date"])
+            clean_df.reset_index(inplace=True, drop=False, names="datetime")
+            clean_df["datetime"] = pd.to_datetime(clean_df["datetime"])
             return clean_df
 
         def clean_news_sentiments():
@@ -52,11 +181,11 @@ class StockService(IStockService):
                             score += float(ticker_sentiment["ticker_sentiment_score"])
                 avg_score = score / len(row["content"]["feed"])
 
-                data.append({"date": row["date"], "stock_index": row["stock_indice"],
+                data.append({"date": row["date"].date(), "stock_index": row["stock_indice"],
                              "news_sentiment": avg_score})
 
             clean_df = pd.DataFrame(data)
-            clean_df["date"] = pd.to_datetime(clean_df["date"])
+            clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
             return clean_df
 
         def clean_social_sentiments():
@@ -110,7 +239,8 @@ class StockService(IStockService):
 
             # Merge the DataFrames on 'date' and 'stock_index'
             clean_df = pd.merge(reddit_df, twitter_df, on=['date', 'stock_index'], how='outer')
-            clean_df["date"] = pd.to_datetime(clean_df["date"])
+
+            clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
 
             return clean_df
 
@@ -118,54 +248,20 @@ class StockService(IStockService):
         clean_news_sentiments = clean_news_sentiments()
         clean_social_sentiments = clean_social_sentiments()
 
-        # resampling to 15 minutes
-        clean_news_sentiments_resampled = pd.DataFrame()
-        for stock_index, group_df in clean_news_sentiments.groupby('stock_index'):
-            group_df = group_df.set_index('date').resample('15T').ffill().reset_index()
-            # TODO: It's not working!! Not resampling last date And filling on nan values
-            clean_news_sentiments_resampled = pd.concat([clean_news_sentiments_resampled, group_df], ignore_index=True)
+        # merging all dataframes
 
-        clean_social_sentiments_resampled = pd.DataFrame()
-        for stock_index, group_df in clean_social_sentiments.groupby('stock_index'):
-            group_df = group_df.set_index('date').resample('15T').ffill().reset_index()
-            # TODO: It's not working!! Not resampling last date And filling on nan values
-            clean_social_sentiments_resampled = pd.concat([clean_social_sentiments_resampled, group_df],
-                                                          ignore_index=True)
+        clean_stock_prices['date'] = clean_stock_prices['datetime'].dt.date
 
-        # TODO: It's not working well also.
-        clean_df = pd.merge(clean_stock_prices, clean_news_sentiments_resampled, on=['date', 'stock_index'], how='left')
-        clean_df = pd.merge(clean_df, clean_social_sentiments_resampled, on=['date', 'stock_index'], how='left')
-
+        clean_df = pd.merge(clean_stock_prices, clean_news_sentiments,
+                            on=["date", "stock_index"], how='left')
+        clean_df = pd.merge(clean_df, clean_social_sentiments,
+                            on=["date", "stock_index"], how='left')
         return clean_df
 
     def refresh_data(self):
-        # retrieve stock indices from constants_service
-        # stock_indices = self.constants_service.stocks_indices()
-
-        # retrieve stock data from stock_repo
-        # raw_dataframe = self.stock_repo.get_all()
-
+        # These methods starts by refreshing the landing data, then cleans it and finally adds it to the clean data table
+        self.refresh_landing_data()
         clean_df = self.clean_landing_data()
         self.stock_repo.add_batch_clean(clean_df)
 
-        # self.perform_refresh(stock_indices, stock_dto_list)
-
         return None
-
-
-    """
-     def get_stock(self, stock_id):
-        return self.stock_repository.get_stock_by_id(stock_id)
-
-    def get_equities(self):
-        return self.stock_repository.get_equities()
-
-    def create_stock(self, stock):
-        return self.stock_repository.create_stock(stock)
-
-    def update_stock(self, stock_id, stock):
-        return self.stock_repository.update_stock(stock_id, stock)
-
-    def delete_stock(self, stock_id):
-        return self.stock_repository.delete_stock(stock_id)
-    """
