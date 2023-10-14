@@ -12,4 +12,4 @@ def test_init():
 
 
 def test_clean_landing_data():
-    stock_service.clean_landing_data()
+    stock_service.refresh_data()

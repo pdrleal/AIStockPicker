@@ -19,7 +19,9 @@ class StockService(IStockService):
         self.stock_repo = stock_repo
         self.stocks_indices = self.constants_repo.get_stocks_indices()
         self.fetch_frequency = self.constants_repo.get_by_key("Fetch Frequency")
-        self.last_update_date = datetime.datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
+        self.last_update_date = self.constants_repo.get_by_key("Last Update Date")
+        if self.last_update_date != "":
+            self.last_update_date = datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
                                                            '%Y-%m-%d %H:%M:%S')
 
     def refresh_landing_data(self):
@@ -157,14 +159,20 @@ class StockService(IStockService):
                 df_temp = df_temp.astype(float)
 
                 # add stock index to dataframe
-                stock_index_column = [row["stock_indice"]] * len(time_series_values)
+                stock_index_column = [row["stock_index"]] * len(time_series_values)
                 df_temp.insert(loc=0, column='stock_index', value=stock_index_column)
                 df_temp["stock_index"] = stock_index_column
 
                 df_list.append(df_temp)
 
             clean_df = pd.concat(df_list)
-            clean_df.columns = ["stock_index", "open", "high", "low", "close", "volume"]
+            clean_df.rename(columns={"1. open": "open",
+                                     "2. high": "high",
+                                     "3. low": "low",
+                                     "4. close": "close",
+                                     "5. volume": "volume"},
+                            inplace=True)
+            clean_df= clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
             clean_df.reset_index(inplace=True, drop=False, names="datetime")
             clean_df["datetime"] = pd.to_datetime(clean_df["datetime"])
             return clean_df
@@ -177,11 +185,11 @@ class StockService(IStockService):
                 score = 0
                 for article in row["content"]["feed"]:
                     for ticker_sentiment in article["ticker_sentiment"]:
-                        if ticker_sentiment["ticker"] == row["stock_indice"]:
+                        if ticker_sentiment["ticker"] == row["stock_index"]:
                             score += float(ticker_sentiment["ticker_sentiment_score"])
                 avg_score = score / len(row["content"]["feed"])
 
-                data.append({"date": row["date"].date(), "stock_index": row["stock_indice"],
+                data.append({"date": row["date"].date(), "stock_index": row["stock_index"],
                              "news_sentiment": avg_score})
 
             clean_df = pd.DataFrame(data)
@@ -226,11 +234,11 @@ class StockService(IStockService):
                 # Calculate the average score for each date and create dictionaries
                 for date, scores in daily_reddit.items():
                     avg_score = sum(scores) / len(scores)
-                    result_dict = {"date": date, "stock_index": row["stock_indice"], "reddit_sentiment": avg_score}
+                    result_dict = {"date": date, "stock_index": row["stock_index"], "reddit_sentiment": avg_score}
                     data_reddit.append(result_dict)
                 for date, scores in daily_twitter.items():
                     avg_score = sum(scores) / len(scores)
-                    result_dict = {"date": date, "stock_index": row["stock_indice"], "twitter_sentiment": avg_score}
+                    result_dict = {"date": date, "stock_index": row["stock_index"], "twitter_sentiment": avg_score}
                     data_twitter.append(result_dict)
 
             # Create DataFrames from the lists
@@ -256,12 +264,21 @@ class StockService(IStockService):
                             on=["date", "stock_index"], how='left')
         clean_df = pd.merge(clean_df, clean_social_sentiments,
                             on=["date", "stock_index"], how='left')
+        clean_df.drop('date', axis=1, inplace=True)
         return clean_df
 
     def refresh_data(self):
         # These methods starts by refreshing the landing data, then cleans it and finally adds it to the clean data table
-        self.refresh_landing_data()
+        #self.refresh_landing_data()
         clean_df = self.clean_landing_data()
         self.stock_repo.add_batch_clean(clean_df)
 
         return None
+
+    def forecast_data(self):
+        forecasts = []
+        for stock_index in self.stocks_indices:
+            url = "https://localhost:5000/forecast?stock_index={}".format(stock_index)
+            r = requests.get(url)
+            if r.status_code == 200:
+                forecasts.append(r.json())

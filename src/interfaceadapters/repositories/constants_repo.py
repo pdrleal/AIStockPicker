@@ -11,7 +11,9 @@ class ConstantsRepo(IConstantsRepo):
         user = os.getenv('MYSQL_USER')
         password = os.getenv('MYSQL_PASSWORD')
         db_name = os.getenv('MYSQL_DB_NAME')
-        self.engine = create_engine(f"mysql+pymysql://{user}:{password}@localhost:3306/{db_name}")
+        host = os.getenv('MYSQL_HOST')
+        port = os.getenv('MYSQL_PORT')
+        self.engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}:{port}/{db_name}")
 
     def get_stocks_indices(self):
         with self.engine.connect() as conn:
