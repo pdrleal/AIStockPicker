@@ -13,8 +13,9 @@ CREATE TRIGGER update_last_date_news_sentiment
 AFTER INSERT ON LANDING_NEWS_SENTIMENT
 FOR EACH ROW
 BEGIN
-    UPDATE VARIABLES
-    SET LastUpdateDate = CONVERT_TZ(NOW(), 'SYSTEM', 'Europe/Lisbon');
+    UPDATE `VARIABLES`
+    SET `value` = CONVERT_TZ(NOW(), 'SYSTEM', 'Europe/Lisbon') 
+    WHERE `key`='Last Update Date';
 END;
 //
 
@@ -23,8 +24,9 @@ CREATE TRIGGER update_last_date_stock_values
 AFTER INSERT ON LANDING_STOCK_VALUES
 FOR EACH ROW
 BEGIN
-    UPDATE VARIABLES
-    SET LastUpdateDate = CONVERT_TZ(NOW(), 'SYSTEM', 'Europe/Lisbon');
+    UPDATE `VARIABLES`
+    SET `value` = CONVERT_TZ(NOW(), 'SYSTEM', 'Europe/Lisbon') 
+    WHERE `key`='Last Update Date';
 END;
 //
 
@@ -33,8 +35,9 @@ CREATE TRIGGER update_last_date_social_sentiment
 AFTER INSERT ON LANDING_SOCIAL_SENTIMENT
 FOR EACH ROW
 BEGIN
-    UPDATE VARIABLES
-    SET LastUpdateDate = CONVERT_TZ(NOW(), 'SYSTEM', 'Europe/Lisbon');
+    UPDATE `VARIABLES`
+    SET `value` = CONVERT_TZ(NOW(), 'SYSTEM', 'Europe/Lisbon') 
+    WHERE `key`='Last Update Date';
 END;
 //
 

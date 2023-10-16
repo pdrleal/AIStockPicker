@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime,timedelta
 import json
 
 import pandas as pd
@@ -22,7 +22,7 @@ class StockService(IStockService):
         self.last_update_date = self.constants_repo.get_by_key("Last Update Date")
         if self.last_update_date != "":
             self.last_update_date = datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
-                                                           '%Y-%m-%d %H:%M:%S')
+                                                      '%Y-%m-%d %H:%M:%S')
 
     def refresh_landing_data(self):
         def get_daily_stock_values(symbol: str, start_date: datetime.date, end_date: datetime.date, interval: str,
@@ -94,7 +94,7 @@ class StockService(IStockService):
                                               api_key: str):
 
             # adjust date to monday
-            adjusted_start_date = start_date - datetime.timedelta(days=(start_date.weekday() - 0) % 7)
+            adjusted_start_date = start_date - timedelta(days=(start_date.weekday() - 0) % 7)
 
             total_count = 0
             for _ in rrule.rrule(rrule.WEEKLY, dtstart=adjusted_start_date, until=end_date):
@@ -106,7 +106,7 @@ class StockService(IStockService):
             for date in rrule.rrule(rrule.WEEKLY, dtstart=adjusted_start_date, until=end_date):
                 # fetch date from monday to saturday
                 from_date_str = str(date.year) + "-" + '{:02d}'.format(date.month) + "-" + '{:02d}'.format(date.day)
-                to_date = date + datetime.timedelta(days=5)
+                to_date = date + timedelta(days=5)
                 to_date_str = str(to_date.year) + "-" + '{:02d}'.format(to_date.month) + "-" + '{:02d}'.format(
                     to_date.day)
                 url = "https://finnhub.io/api/v1/stock/social-sentiment?" + \
@@ -128,15 +128,17 @@ class StockService(IStockService):
             # start from the beginning - 18 months
             start_date = datetime.now().date() - relativedelta(months=18)
         else:
-            # start from the date before the last update date
-            start_date = self.last_update_date.date() - datetime.timedelta(days=1)
+            # start from the day before the last update date
+            start_date = self.last_update_date.date() - timedelta(days=1)
 
         # if market still open, use data from the day before
         if datetime.now(tz=pytz.timezone('US/Eastern')).hour < 17:
-            end_date = datetime.now().date() - datetime.timedelta(days=1)
+            end_date = datetime.now().date() - timedelta(days=1)
         else:
             end_date = datetime.now().date()
 
+        print(f"Start date: {start_date}| End date: {end_date}")
+        print()
         alpha_vantage_apikey = self.constants_repo.get_by_key("Alpha Vantage API Key")
         finnhub_apikey = self.constants_repo.get_by_key("Finnhub API Key")
         for symbol in self.stocks_indices:
@@ -172,7 +174,7 @@ class StockService(IStockService):
                                      "4. close": "close",
                                      "5. volume": "volume"},
                             inplace=True)
-            clean_df= clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
+            clean_df = clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
             clean_df.reset_index(inplace=True, drop=False, names="datetime")
             clean_df["datetime"] = pd.to_datetime(clean_df["datetime"])
             return clean_df
