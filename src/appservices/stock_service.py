@@ -1,6 +1,7 @@
 from datetime import datetime,timedelta
 import json
 
+import numpy as np
 import pandas as pd
 import pytz
 import requests
@@ -20,7 +21,7 @@ class StockService(IStockService):
         self.stocks_indices = self.constants_repo.get_stocks_indices()
         self.fetch_frequency = self.constants_repo.get_by_key("Fetch Frequency")
         self.last_update_date = self.constants_repo.get_by_key("Last Update Date")
-        if self.last_update_date != "":
+        if self.last_update_date is not None:
             self.last_update_date = datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
                                                       '%Y-%m-%d %H:%M:%S')
 
@@ -48,16 +49,17 @@ class StockService(IStockService):
                           format(api_key, symbol, interval, date_str)
                 while True:
                     r = requests.get(url)
-                    # TODO: check if it's the correct way to check if the api key is expired
-                    if r.text != '{\n    "Note": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute and 100 calls per day. Please visit https://www.alphavantage.co/premium/ if you would like to target a higher API call frequency."\n}':
-                        break
 
+                    if "Meta Data" in r.text:
+                        break
                 data = r.json()
                 self.stock_repo.add_landing_stock_prices(symbol, date_str, data)
                 count += 1
                 print(f"Stocks prices | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
 
         def get_daily_news_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date, api_key: str):
+            # set day as first of month, since values are fetched monthly
+            start_date = start_date.replace(day=1)
 
             total_count = 0;
             for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
@@ -78,8 +80,7 @@ class StockService(IStockService):
                               format(api_key, symbol, time_from, time_to)
                     while True:
                         r = requests.get(url)
-                        # TODO: check if it's the correct way to check if the api key is expired
-                        if r.text != '{\n    "Note": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute and 100 calls per day. Please visit https://www.alphavantage.co/premium/ if you would like to target a higher API call frequency."\n}':
+                        if "items" in r.text:
                             break
 
                     data = r.json()
@@ -124,9 +125,9 @@ class StockService(IStockService):
                 count += 1
                 print(f"Social Sentiment | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
 
-        if self.last_update_date == "":
-            # start from the beginning - 18 months
-            start_date = datetime.now().date() - relativedelta(months=18)
+        if self.last_update_date is None:
+            # start from the beginning - 19 months
+            start_date = datetime.now().date() - relativedelta(months=19)
         else:
             # start from the day before the last update date
             start_date = self.last_update_date.date() - timedelta(days=1)
@@ -144,7 +145,7 @@ class StockService(IStockService):
         for symbol in self.stocks_indices:
             get_daily_stock_values(symbol, start_date, end_date, self.fetch_frequency, alpha_vantage_apikey)
             get_daily_news_sentiments(symbol, start_date, end_date, alpha_vantage_apikey)
-            get_weekly_social_media_sentiment(symbol, start_date, end_date, finnhub_apikey)
+            #get_weekly_social_media_sentiment(symbol, start_date, end_date, finnhub_apikey)
         return True
 
     def clean_landing_data(self):
@@ -189,7 +190,10 @@ class StockService(IStockService):
                     for ticker_sentiment in article["ticker_sentiment"]:
                         if ticker_sentiment["ticker"] == row["stock_index"]:
                             score += float(ticker_sentiment["ticker_sentiment_score"])
-                avg_score = score / len(row["content"]["feed"])
+                if len(row["content"]["feed"]) == 0:
+                    avg_score = np.NAN
+                else:
+                    avg_score = score / len(row["content"]["feed"])
 
                 data.append({"date": row["date"].date(), "stock_index": row["stock_index"],
                              "news_sentiment": avg_score})
