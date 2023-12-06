@@ -57,7 +57,4 @@ class StockRepo(IStockRepo):
 
     def add_batch_clean(self, clean_df: pd.DataFrame):
         clean_df.to_sql('CLEAN_DATA', self.engine, if_exists='replace', index=False)
-        # TODO: add primary key
-        # with self.engine.connect() as con:
-        #     con.execute(text('ALTER TABLE CLEAN_DATA ADD PRIMARY KEY(date(255),stock_index(255));'))
         return True
