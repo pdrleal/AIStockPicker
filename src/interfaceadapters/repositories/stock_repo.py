@@ -45,7 +45,8 @@ class StockRepo(IStockRepo):
         return True
 
     def get_landing_stock_prices(self) -> pd.DataFrame:
-        return pd.read_sql_table('LANDING_STOCK_VALUES', self.engine)
+        return pd.read_sql_table('LANDING_STOCK_VALUES', self.engine,
+                                 parse_dates={'date': '%Y-%m-%d'})
 
     def get_landing_news_sentiments(self) -> pd.DataFrame:
         return pd.read_sql_table('LANDING_NEWS_SENTIMENT', self.engine,

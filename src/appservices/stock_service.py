@@ -39,6 +39,14 @@ class StockService(IStockService):
             self.last_update_date = datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
                                                       '%Y-%m-%d %H:%M:%S')
 
+    def load_dates_without_weekends(self, start_date, end_date):
+        self.dates = []
+        for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
+            if date.weekday() in [5, 6]:
+                continue
+            self.dates.append(date.date())
+        pass
+
     def refresh_landing_data(self):
         def get_daily_stock_values(symbol: str, start_date: datetime.date, end_date: datetime.date, interval: str,
                                    api_key: str):
@@ -65,7 +73,7 @@ class StockService(IStockService):
                     if "Meta Data" in r.text:
                         break
                 data = r.json()
-                self.stock_repo.add_landing_stock_prices(symbol, date_str, data)
+                self.stock_repo.add_landing_stock_prices(symbol, date_str + '-01', data)
                 count += 1
                 print(f"Stocks prices | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
 
@@ -212,6 +220,11 @@ class StockService(IStockService):
 
         def clean_stock_prices(last_recorded_date, cleaned_frequency=self.cleaned_frequency):
             landing_stock_prices = self.stock_repo.get_landing_stock_prices()
+
+            if not self.append_to_clean_table:
+                oldest_recorded_date = landing_stock_prices["date"].min().date()
+                newest_recorded_date = max(self.dates)
+                self.load_dates_without_weekends(oldest_recorded_date, newest_recorded_date)
 
             df_list = []  # Initialize an empty list to store DataFrames
             for index, row in landing_stock_prices.iterrows():
