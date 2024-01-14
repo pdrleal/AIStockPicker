@@ -1,10 +1,9 @@
 from dependency_injector import containers, providers
-from src.appservices.constants_service import ConstantsService
-from src.interfaceadapters.repositories.constants_repo import ConstantsRepo
 
-from src.interfaceadapters.repositories.stock_repo import StockRepo
 from src.appservices.stock_service import StockService
 from src.interfaceadapters.controllers.stock_controller import StockController
+from src.interfaceadapters.repositories.constants_repo import ConstantsRepo
+from src.interfaceadapters.repositories.stock_repo import StockRepo
 
 
 def setup_dependency_container(app, modules=None, packages=None):

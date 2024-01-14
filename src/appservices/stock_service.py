@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import json
 
 import numpy as np
 import pandas as pd
@@ -25,6 +24,7 @@ class StockService(IStockService):
         self.append_to_clean_table = None
         self.last_update_date = None
         self.dates = None
+        self.reload_parameters()
 
     def reload_parameters(self):
         """
@@ -373,7 +373,7 @@ class StockService(IStockService):
         self.reload_parameters()
 
         # Step 2: Refresh landing data from the source
-        #self.refresh_landing_data()
+        self.refresh_landing_data()
 
         # Step 3: Clean the landing data to prepare it for storage
         self.clean_landing_data()
@@ -383,7 +383,7 @@ class StockService(IStockService):
     def forecast_data(self):
         forecasts = []
         for stock_index in self.stocks_indices:
-            url = "https://localhost:5000/forecast?stock_index={}".format(stock_index)
+            url = "http://localhost:5001/forecast?stock_index={}".format(stock_index)
             r = requests.get(url)
             if r.status_code == 200:
                 forecasts.append(r.json())

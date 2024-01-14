@@ -1,7 +1,9 @@
-from src.appservices.irepositories.iconstants_repo import IConstantsRepo
-from sqlalchemy import create_engine, text
-from dotenv import load_dotenv, find_dotenv
 import os
+
+from dotenv import load_dotenv, find_dotenv
+from sqlalchemy import create_engine, text
+
+from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 
 
 class ConstantsRepo(IConstantsRepo):

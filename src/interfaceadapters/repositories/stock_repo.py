@@ -1,11 +1,11 @@
 import json
-from abc import ABC
+import os
 
 import pandas as pd
-from sqlalchemy import create_engine, text
-from src.appservices.irepositories.istock_repo import IStockRepo
 from dotenv import load_dotenv, find_dotenv
-import os
+from sqlalchemy import create_engine, text
+
+from src.appservices.irepositories.istock_repo import IStockRepo
 
 
 class StockRepo(IStockRepo):
@@ -67,11 +67,11 @@ class StockRepo(IStockRepo):
     def get_clean_stock_prices(self) -> pd.DataFrame:
         return pd.read_sql_table('CLEAN_DATA', self.engine)
 
-    def get_stock_landing_news_sentiments(self,stock_index) -> pd.DataFrame:
+    def get_stock_landing_news_sentiments(self, stock_index) -> pd.DataFrame:
         query_params = {'stock_index': stock_index}
         return pd.read_sql_table('LANDING_NEWS_SENTIMENT', self.engine,
                                  parse_dates={'date': '%Y-%m-%d'}, params=query_params)
 
-    def get_stock_clean_stock_prices(self,stock_index) -> pd.DataFrame:
+    def get_stock_clean_stock_prices(self, stock_index) -> pd.DataFrame:
         query_params = {'stock_index': stock_index}
         return pd.read_sql_table('CLEAN_DATA', self.engine, params=query_params)
