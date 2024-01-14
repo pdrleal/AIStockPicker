@@ -28,5 +28,13 @@ class IStockRepo(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def add_batch_clean(self, clean_df: pd.DataFrame):
+    def append_to_clean_table(self, clean_df: pd.DataFrame):
+        pass
+
+    @abc.abstractmethod
+    def replace_clean_table_by(self, clean_df: pd.DataFrame):
+        pass
+
+    @abc.abstractmethod
+    def get_clean_stock_prices(self) -> pd.DataFrame:
         pass

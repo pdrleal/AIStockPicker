@@ -1,4 +1,5 @@
 import json
+from abc import ABC
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -55,6 +56,22 @@ class StockRepo(IStockRepo):
                                  parse_dates={'start_date': '%Y-%m-%d',
                                               'end_date': '%Y-%m-%d'})
 
-    def add_batch_clean(self, clean_df: pd.DataFrame):
+    def append_to_clean_table(self, clean_df: pd.DataFrame):
+        clean_df.to_sql('CLEAN_DATA', self.engine, if_exists='append', index=False)
+        return True
+
+    def replace_clean_table_by(self, clean_df: pd.DataFrame):
         clean_df.to_sql('CLEAN_DATA', self.engine, if_exists='replace', index=False)
         return True
+
+    def get_clean_stock_prices(self) -> pd.DataFrame:
+        return pd.read_sql_table('CLEAN_DATA', self.engine)
+
+    def get_stock_landing_news_sentiments(self,stock_index) -> pd.DataFrame:
+        query_params = {'stock_index': stock_index}
+        return pd.read_sql_table('LANDING_NEWS_SENTIMENT', self.engine,
+                                 parse_dates={'date': '%Y-%m-%d'}, params=query_params)
+
+    def get_stock_clean_stock_prices(self,stock_index) -> pd.DataFrame:
+        query_params = {'stock_index': stock_index}
+        return pd.read_sql_table('CLEAN_DATA', self.engine, params=query_params)
