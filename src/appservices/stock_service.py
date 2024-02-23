@@ -366,8 +366,8 @@ class StockService(IStockService):
         # Concat the old and new dataframes
         if self.append_to_clean_table:
             clean_df = pd.concat([old_clean_df, clean_df])
-            "sorty by index and then date"
-            clean_df = clean_df.sort_values(by=["stock_index", "datetime"])
+
+        clean_df = clean_df.sort_values(by=["stock_index", "datetime"])
 
         # Add the cleaned data to the clean data table
         self.stock_repo.replace_clean_table_by(clean_df)
