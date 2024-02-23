@@ -382,7 +382,7 @@ class StockService(IStockService):
         self.reload_parameters()
 
         # Step 2: Refresh landing data from the source
-        #self.refresh_landing_data()
+        self.refresh_landing_data()
 
         # Step 3: Clean the landing data to prepare it for storage
         self.clean_landing_data()
