@@ -44,18 +44,35 @@ class StockRepo(IStockRepo):
             conn.commit()
         return True
 
-    def get_landing_stock_prices(self) -> pd.DataFrame:
-        return pd.read_sql_table('LANDING_STOCK_VALUES', self.engine,
-                                 parse_dates={'date': '%Y-%m-%d'})
+    def get_landing_stock_prices(self, min_date=None) -> pd.DataFrame:
+        if min_date is not None:
+            query = f"SELECT * FROM LANDING_STOCK_VALUES WHERE date >= '{min_date}'"
+            df = pd.read_sql_query(query, self.engine, parse_dates={'date': '%Y-%m-%d'})
+            df['content'] = df['content'].apply(json.loads)
+        else:
+            df = pd.read_sql_table('LANDING_STOCK_VALUES', self.engine, parse_dates={'date': '%Y-%m-%d'})
 
-    def get_landing_news_sentiments(self) -> pd.DataFrame:
-        return pd.read_sql_table('LANDING_NEWS_SENTIMENT', self.engine,
-                                 parse_dates={'date': '%Y-%m-%d'})
+        return df
 
-    def get_landing_social_sentiments(self) -> pd.DataFrame:
-        return pd.read_sql_table('LANDING_SOCIAL_SENTIMENT', self.engine,
-                                 parse_dates={'start_date': '%Y-%m-%d',
-                                              'end_date': '%Y-%m-%d'})
+    def get_landing_news_sentiments(self, min_date=None) -> pd.DataFrame:
+        if min_date is not None:
+            query = f"SELECT * FROM LANDING_NEWS_SENTIMENT WHERE date >= '{min_date}'"
+            df = pd.read_sql_query(query, self.engine, parse_dates={'date': '%Y-%m-%d'})
+            df['content'] = df['content'].apply(json.loads)
+        else:
+            df = pd.read_sql_table('LANDING_NEWS_SENTIMENT', self.engine, parse_dates={'date': '%Y-%m-%d'})
+
+        return df
+
+    def get_landing_social_sentiments(self, min_date=None) -> pd.DataFrame:
+        if min_date is not None:
+            query = f"SELECT * FROM LANDING_SOCIAL_SENTIMENT WHERE start_date >= '{min_date}'"
+            df = pd.read_sql_query(query, self.engine, parse_dates={'start_date': '%Y-%m-%d', 'end_date': '%Y-%m-%d'})
+            df['content'] = df['content'].apply(json.loads)
+        else:
+            df = pd.read_sql_table('LANDING_SOCIAL_SENTIMENT', self.engine,
+                                     parse_dates={'start_date': '%Y-%m-%d', 'end_date': '%Y-%m-%d'})
+        return df
 
     def append_to_clean_table(self, clean_df: pd.DataFrame):
         clean_df.to_sql('CLEAN_DATA', self.engine, if_exists='append', index=False)
