@@ -44,11 +44,13 @@ class StockService(IStockService):
                                                       '%Y-%m-%d %H:%M:%S')
 
     def load_open_market_dates(self, start_date, end_date):
+        self.dates = []
         for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
             if date.weekday() in [5, 6] or date.date() in self.market_holidays:
                 continue
             self.dates.append(date.date())
 
+    # TODO incluir volume do endpoint de daily_adjusted -> restantes preços estão bem.
     def refresh_landing_data(self):
         def refresh_daily_stock_values(symbol: str, start_date: datetime.date, end_date: datetime.date, interval: str,
                                        api_key: str):
@@ -101,17 +103,15 @@ class StockService(IStockService):
                 count += 1;
                 print(f"News Sentiment | {symbol} | {count}/{total_count} | {(count * 100 / total_count):.0f} %")
 
-        # TODO: Implementar
-        def refresh_weekly_social_media_sentiment(symbol: str, start_date: datetime.date, end_date: datetime.date,
+        def refresh_weekly_social_media_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date,
                                                   api_key: str):
-
+            symbol_transformed = symbol.replace('-', '.')
             # adjust date to monday
             adjusted_start_date = start_date - timedelta(days=(start_date.weekday() - 0) % 7)
 
             total_count = 0
             for _ in rrule.rrule(rrule.WEEKLY, dtstart=adjusted_start_date, until=end_date):
                 total_count += 1
-
             count = 0
 
             # iterate through weeks to get social sentiment
@@ -122,19 +122,18 @@ class StockService(IStockService):
                 to_date_str = str(to_date.year) + "-" + '{:02d}'.format(to_date.month) + "-" + '{:02d}'.format(
                     to_date.day)
                 url = "https://finnhub.io/api/v1/stock/social-sentiment?" + \
-                      "token={}&symbol={}&from={}&to={}".format(api_key, symbol, from_date_str, to_date_str)
+                      "token={}&symbol={}&from={}&to={}".format(api_key, symbol_transformed, from_date_str, to_date_str)
                 while True:
                     r = requests.get(url)
                     if r.status_code not in {401, 429}:
                         break
+                    print("error")
 
                 data = r.json()
                 self.stock_repo.add_landing_social_sentiments(symbol, from_date_str, to_date_str, data)
-                start_date_str = date.strftime("%Y-%m-%d")
-                end_date_str = to_date.strftime("%Y-%m-%d")
 
                 count += 1
-                print(f"Social Sentiment | {symbol} | {count}/{total_count} | {(count * 100 / total_count):.0f} %")
+                print(f"Social Sentiment | {symbol} | {from_date_str} to {to_date_str} | {count}:{total_count} | {(count*100/total_count):.0f} %")
 
         if self.last_update_date is None:
             # start from the beginning - 19 months
@@ -160,7 +159,7 @@ class StockService(IStockService):
             print(f"Fetching data for {symbol}...({stock_count}/{len(self.stocks_indices)})")
             refresh_daily_stock_values(symbol, start_date, end_date, self.fetch_frequency, alpha_vantage_apikey)
             refresh_daily_news_sentiments(symbol, start_date, end_date, alpha_vantage_apikey)
-            # refresh_weekly_social_media_sentiment(symbol, start_date, end_date, finnhub_apikey)
+            refresh_weekly_social_media_sentiments(symbol, start_date, end_date, finnhub_apikey)
 
             stock_count += 1
 
@@ -189,9 +188,7 @@ class StockService(IStockService):
                             minutes_published = int(time_published[9:11]) * 60 + int(time_published[11:13])
                             minutes_closed_market = 16 * 60
                             num_articles += 1
-
                             score += sentiment_score
-                            # TODO: Validar melhores correlacoes entre sentimentos e horarios
                 if len(row["content"]["feed"]) == 0:
                     avg_score = np.NAN
                 else:
@@ -246,8 +243,6 @@ class StockService(IStockService):
                         df_temp = pd.concat([df_temp, pd.DataFrame(index=missing_date_times)])
 
                 df_temp = df_temp.sort_index().ffill().bfill()
-                # TODO: Verificar resultados do resample com output de api.
-                # ex: 60d -> 9:30, 10:30, 11:30, 12:30, 13:30, 14:30, 15:30.
                 df_temp = df_temp.resample(rule=cleaned_frequency, origin='start').apply({
                     "1. open": "first",
                     "2. high": "max",
@@ -275,7 +270,8 @@ class StockService(IStockService):
             clean_df.reset_index(inplace=True, drop=False, names="datetime")
             return clean_df
 
-        # TODO Implementar
+        """ Version with twitter and reddit sentiments
+
         def clean_social_sentiments():
             landing_social_sentiments = self.stock_repo.get_landing_social_sentiments()
 
@@ -334,6 +330,55 @@ class StockService(IStockService):
 
             return clean_df
 
+        """
+        def clean_social_sentiments(last_recorded_date = None):
+            # set last_recorded_date to the previous monday
+            if last_recorded_date is not None:
+                last_recorded_date = last_recorded_date - timedelta(days=(last_recorded_date.weekday() - 0) % 7)
+            landing_social_sentiments = self.stock_repo.get_landing_social_sentiments(min_date= last_recorded_date)
+
+            sentiments_data =[]
+            for index, row in landing_social_sentiments.iterrows():
+                start_date = pd.to_datetime(row["start_date"]).date()
+                end_date = pd.to_datetime(row["end_date"]).date()
+
+                daily_sentiment = {}
+                sorted_data = sorted(row["content"]["data"], key=lambda x: x["atTime"])
+                # create dataframe with stock values
+                for sentiment in sorted_data:
+
+                    date = pd.to_datetime(sentiment["atTime"], format='%Y-%m-%d %H:%M:%S').date()
+                    # Skip the sentiment if the date is the 6th day (saturday)
+                    if date.weekday() > 4 or (self.append_to_clean_table and date <= last_recorded_date):
+                        continue
+                    # Initialize a list for the date if it doesn't exist in daily_info
+                    if date not in daily_sentiment:
+                        daily_sentiment[date] = []
+                    # Append the Reddit sentiment score to the list
+                    daily_sentiment[date].append(float(sentiment["score"]))
+
+                # Iterate through dates
+                current_date = start_date
+                while current_date < end_date:
+                    if current_date.weekday() > 4 or current_date in daily_sentiment.keys() or \
+                            (self.append_to_clean_table and current_date <= last_recorded_date):
+                        current_date += timedelta(days=1)
+                        continue
+                    daily_sentiment[current_date] = []
+                    current_date += timedelta(days=1)
+                # TODO check correlation between social media and stock prices
+                # Calculate the average score for each date and create dictionaries
+                for date, scores in daily_sentiment.items():
+                    if len(scores) == 0:
+                        avg_score = np.NAN
+                    else:
+                        avg_score = sum(scores) / len(scores)
+                    result_dict = {"stock_index": row["stock_index"], "date": date, "social_sentiment": avg_score}
+                    sentiments_data.append(result_dict)
+
+            clean_df = pd.DataFrame(sentiments_data)
+            clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
+            return clean_df
 
         print(f"Cleaning data ...")
         old_clean_df = None
@@ -344,22 +389,28 @@ class StockService(IStockService):
             last_recorded_date = old_clean_df["datetime"].max().date()
 
             clean_news_sentiments = clean_news_sentiments(last_recorded_date=last_recorded_date)
+            print(f"News sentiment data cleaned.")
             self.load_open_market_dates(clean_news_sentiments['date'].min(), clean_news_sentiments['date'].max())
             clean_stock_prices = clean_stock_prices(last_recorded_date=last_recorded_date)
-            # clean_social_sentiments = clean_social_sentiments(last_recorded_date)
+            print(f"Stock prices data cleaned.")
+            clean_social_sentiments = clean_social_sentiments(last_recorded_date)
+            print(f"Social sentiment data cleaned.")
         else:
             clean_news_sentiments = clean_news_sentiments()
+            print(f"News sentiment data cleaned.")
             clean_stock_prices = clean_stock_prices(max_date=clean_news_sentiments['date'].max())
-            # clean_social_sentiments = clean_social_sentiments()
+            print(f"Stock prices data cleaned.")
+            clean_social_sentiments = clean_social_sentiments()
+            print(f"Social sentiment data cleaned.")
 
         # merging all dataframes
-
+        # TODO: A DAR VALOR REPETIVOS PARA 2024-01-12
         clean_stock_prices['date'] = clean_stock_prices['datetime'].dt.date
 
         clean_df = pd.merge(clean_stock_prices, clean_news_sentiments,
                             on=["date", "stock_index"], how='left')
-        # clean_df = pd.merge(clean_df, clean_social_sentiments,
-        #                    on=["date", "stock_index"], how='left')
+        clean_df = pd.merge(clean_df, clean_social_sentiments,
+                            on=["date", "stock_index"], how='left')
         clean_df.drop('date', axis=1, inplace=True)
 
         clean_df = clean_df[~clean_df.index.isin(self.market_holidays)]
@@ -382,7 +433,7 @@ class StockService(IStockService):
         self.reload_parameters()
 
         # Step 2: Refresh landing data from the source
-        self.refresh_landing_data()
+        # self.refresh_landing_data()
 
         # Step 3: Clean the landing data to prepare it for storage
         self.clean_landing_data()
