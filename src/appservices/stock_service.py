@@ -404,7 +404,6 @@ class StockService(IStockService):
             print(f"Social sentiment data cleaned.")
 
         # merging all dataframes
-        # TODO: A DAR VALOR REPETIVOS PARA 2024-01-12
         clean_stock_prices['date'] = clean_stock_prices['datetime'].dt.date
 
         clean_df = pd.merge(clean_stock_prices, clean_news_sentiments,
@@ -442,8 +441,14 @@ class StockService(IStockService):
 
     def forecast_data(self):
         forecasts = []
-        for stock_index in self.stocks_indices:
-            url = "http://localhost:5001/forecast?stock_index={}".format(stock_index)
+        count = 0
+        total_count = len(self.stocks_indices)
+        #for stock_index in self.stocks_indices:
+        for stock_index in ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']:
+            print(f"Forecasting {stock_index} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
+            url = f"http://localhost:5001/forecast?stock_index={stock_index}"
             r = requests.get(url)
             if r.status_code == 200:
                 forecasts.append(r.json())
+            count += 1
+        return forecasts
