@@ -52,34 +52,22 @@ class StockService(IStockService):
 
     # TODO incluir volume do endpoint de daily_adjusted -> restantes preços estão bem.
     def refresh_landing_data(self):
-        def refresh_daily_stock_values(symbol: str, start_date: datetime.date, end_date: datetime.date, interval: str,
-                                       api_key: str):
+        def refresh_daily_stock_values(symbol: str, api_key: str):
+            total_count = 1
+            count = 0
 
-            # set day as first of month, since values are fetched monthly
-            start_date = start_date.replace(day=1)
+            url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED" + \
+                  "&apikey={}&symbol={}&outputsize=full". \
+                      format(api_key, symbol)
+            while True:
+                r = requests.get(url)
+                if "Meta Data" in r.text:
+                    break
+            data = r.json()
+            self.stock_repo.add_landing_stock_prices(symbol, data)
 
-            total_count = 0;
-            for _ in rrule.rrule(rrule.MONTHLY, dtstart=start_date, until=end_date):
-                total_count += 1;
-
-            count = 0;
-            # iterate through months to get stock values
-            for date in rrule.rrule(rrule.MONTHLY, dtstart=start_date, until=end_date):
-                year_str = str(date.year)
-                month_str = '{:02d}'.format(date.month)
-                date_str = year_str + "-" + month_str
-                url = "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY" + \
-                      "&apikey={}&symbol={}&interval=5min&month={}&outputsize=full&extended_hours=false". \
-                          format(api_key, symbol, date_str)
-                while True:
-                    r = requests.get(url)
-                    if "Meta Data" in r.text:
-                        break
-                data = r.json()
-                self.stock_repo.add_landing_stock_prices(symbol, date_str + '-01', data)
-
-                count += 1
-                print(f"Stocks prices | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
+            count += 1
+            print(f"Stocks prices | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
 
         def refresh_daily_news_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date,
                                           api_key: str):
@@ -104,7 +92,7 @@ class StockService(IStockService):
                 print(f"News Sentiment | {symbol} | {count}/{total_count} | {(count * 100 / total_count):.0f} %")
 
         def refresh_weekly_social_media_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date,
-                                                  api_key: str):
+                                                   api_key: str):
             symbol_transformed = symbol.replace('-', '.')
             # adjust date to monday
             adjusted_start_date = start_date - timedelta(days=(start_date.weekday() - 0) % 7)
@@ -133,7 +121,8 @@ class StockService(IStockService):
                 self.stock_repo.add_landing_social_sentiments(symbol, from_date_str, to_date_str, data)
 
                 count += 1
-                print(f"Social Sentiment | {symbol} | {from_date_str} to {to_date_str} | {count}:{total_count} | {(count*100/total_count):.0f} %")
+                print(
+                    f"Social Sentiment | {symbol} | {from_date_str} to {to_date_str} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
 
         if self.last_update_date is None:
             # start from the beginning - 19 months
@@ -157,7 +146,7 @@ class StockService(IStockService):
 
         for symbol in self.stocks_indices:
             print(f"Fetching data for {symbol}...({stock_count}/{len(self.stocks_indices)})")
-            refresh_daily_stock_values(symbol, start_date, end_date, self.fetch_frequency, alpha_vantage_apikey)
+            refresh_daily_stock_values(symbol, alpha_vantage_apikey)
             refresh_daily_news_sentiments(symbol, start_date, end_date, alpha_vantage_apikey)
             refresh_weekly_social_media_sentiments(symbol, start_date, end_date, finnhub_apikey)
 
@@ -169,7 +158,8 @@ class StockService(IStockService):
 
         def clean_news_sentiments(last_recorded_date=None):
             if last_recorded_date is not None:
-                landing_news_sentiments = self.stock_repo.get_landing_news_sentiments(last_recorded_date + timedelta(days=1))
+                landing_news_sentiments = self.stock_repo.get_landing_news_sentiments(
+                    last_recorded_date + timedelta(days=1))
             else:
                 landing_news_sentiments = self.stock_repo.get_landing_news_sentiments()
             data = []  # Initialize an empty list to store rows
@@ -202,13 +192,10 @@ class StockService(IStockService):
             return clean_df
 
         def clean_stock_prices(last_recorded_date=None, cleaned_frequency=self.cleaned_frequency, max_date=None):
-            if last_recorded_date is not None:
-                landing_stock_prices = self.stock_repo.get_landing_stock_prices(min_date=last_recorded_date.replace(day=1))
-            else:
-                landing_stock_prices = self.stock_repo.get_landing_stock_prices()
+            landing_stock_prices = self.stock_repo.get_landing_stock_prices()
 
             if not self.append_to_clean_table:
-                self.load_open_market_dates(landing_stock_prices.date[0].date(), max_date)
+                self.load_open_market_dates(datetime(2021, 7, 1).date(), max_date)
             df_list = []  # Initialize an empty list to store DataFrames
             for index, row in landing_stock_prices.iterrows():
                 # create dataframe with stock values
@@ -219,44 +206,23 @@ class StockService(IStockService):
                 df_temp.index = pd.to_datetime(df_temp.index)
 
                 # add missing times
-                # Filter dates for the specified month
-                filtered_dates = [date for date in self.dates if (date.month == df_temp.index[0].month) and
-                                  (date.year == df_temp.index[0].year)]
-
-                df_temp = df_temp.loc[pd.to_datetime(df_temp.index.date).isin(filtered_dates)]
+                df_temp = df_temp.loc[pd.to_datetime(df_temp.index.date).isin(self.dates)]
 
                 if len(df_temp) == 0:
                     continue  # Skip if there is no new data
-
-                times_value_counts = pd.Series(df_temp.index.time).value_counts().to_dict()
-                # Check if all value counts are equal
-                are_value_counts_equal = len(set(times_value_counts.values())) == 1
-                if (not are_value_counts_equal) or (len(set(df_temp.index.date)) != len(filtered_dates)):
-                    # Add the missing times
-                    for each_date in filtered_dates:
-                        start_time = pd.Timestamp(each_date) + pd.Timedelta(hours=9, minutes=30)
-                        end_time = pd.Timestamp(each_date) + pd.Timedelta(hours=15, minutes=55)
-                        missing_date_times = pd.date_range(start_time, end_time, freq='5T')
-                        missing_date_times = missing_date_times[~missing_date_times.isin(df_temp.index)]
-
+                if len(set(df_temp.index)) != len(self.dates):
+                    # Add the missing days
+                    for each_date in self.dates:
+                        missing_date = pd.date_range(each_date, each_date)
+                        missing_date = missing_date[~missing_date.isin(df_temp.index)]
                         # Add missing date-time combinations
-                        df_temp = pd.concat([df_temp, pd.DataFrame(index=missing_date_times)])
+                        df_temp = pd.concat([df_temp, pd.DataFrame(index=missing_date)])
 
                 df_temp = df_temp.sort_index().ffill().bfill()
-                df_temp = df_temp.resample(rule=cleaned_frequency, origin='start').apply({
-                    "1. open": "first",
-                    "2. high": "max",
-                    "3. low": "min",
-                    "4. close": "last",
-                    "5. volume": "sum"})
-
-                # remove nan's
-                df_temp = df_temp.dropna(subset=["1. open", "2. high", "3. low", "4. close"])
 
                 # add stock index to dataframe
                 stock_index_column = [row["stock_index"]] * len(df_temp)
                 df_temp.insert(loc=0, column="stock_index", value=stock_index_column)
-
                 df_list.append(df_temp)
 
             clean_df = pd.concat(df_list)
@@ -264,8 +230,11 @@ class StockService(IStockService):
                                      "2. high": "high",
                                      "3. low": "low",
                                      "4. close": "close",
-                                     "5. volume": "volume"},
+                                     "6. volume": "volume",
+                                     "8. split coefficient": "split_coefficient"},
                             inplace=True)
+            # Adjust the close price for the split coefficient
+            clean_df['close'] = clean_df['close'] * clean_df['split_coefficient']
             clean_df = clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
             clean_df.reset_index(inplace=True, drop=False, names="datetime")
             return clean_df
@@ -331,13 +300,14 @@ class StockService(IStockService):
             return clean_df
 
         """
-        def clean_social_sentiments(last_recorded_date = None):
+
+        def clean_social_sentiments(last_recorded_date=None):
             # set last_recorded_date to the previous monday
             if last_recorded_date is not None:
                 last_recorded_date = last_recorded_date - timedelta(days=(last_recorded_date.weekday() - 0) % 7)
-            landing_social_sentiments = self.stock_repo.get_landing_social_sentiments(min_date= last_recorded_date)
+            landing_social_sentiments = self.stock_repo.get_landing_social_sentiments(min_date=last_recorded_date)
 
-            sentiments_data =[]
+            sentiments_data = []
             for index, row in landing_social_sentiments.iterrows():
                 start_date = pd.to_datetime(row["start_date"]).date()
                 end_date = pd.to_datetime(row["end_date"]).date()
@@ -361,7 +331,7 @@ class StockService(IStockService):
                 current_date = start_date
                 while current_date < end_date:
                     if current_date.weekday() > 4 or current_date in daily_sentiment.keys() or \
-                            (self.append_to_clean_table and current_date <= last_recorded_date):
+                        (self.append_to_clean_table and current_date <= last_recorded_date):
                         current_date += timedelta(days=1)
                         continue
                     daily_sentiment[current_date] = []
@@ -432,7 +402,7 @@ class StockService(IStockService):
         self.reload_parameters()
 
         # Step 2: Refresh landing data from the source
-        # self.refresh_landing_data()
+        self.refresh_landing_data()
 
         # Step 3: Clean the landing data to prepare it for storage
         self.clean_landing_data()
@@ -443,7 +413,7 @@ class StockService(IStockService):
         forecasts = []
         count = 0
         total_count = len(self.stocks_indices)
-        #for stock_index in self.stocks_indices:
+        # for stock_index in self.stocks_indices:
         for stock_index in ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']:
             print(f"Forecasting {stock_index} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
             url = f"http://localhost:5001/forecast?stock_index={stock_index}"

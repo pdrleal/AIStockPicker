@@ -18,11 +18,11 @@ class StockRepo(IStockRepo):
         port = os.getenv('MYSQL_PORT')
         self.engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}:{port}/{db_name}")
 
-    def add_landing_stock_prices(self, symbol, date_str, data):
+    def add_landing_stock_prices(self, symbol, data):
         with self.engine.connect() as conn:
             conn.execute(text(
-                "REPLACE INTO LANDING_STOCK_VALUES (stock_index, date, content) VALUES (:symbol, :date, :content)"),
-                {"symbol": symbol, "date": date_str, "content": json.dumps(data)})
+                "REPLACE INTO LANDING_STOCK_VALUES (stock_index, content) VALUES (:symbol, :content)"),
+                {"symbol": symbol, "content": json.dumps(data)})
             conn.commit()
         return True
 
@@ -44,15 +44,8 @@ class StockRepo(IStockRepo):
             conn.commit()
         return True
 
-    def get_landing_stock_prices(self, min_date=None) -> pd.DataFrame:
-        if min_date is not None:
-            query = f"SELECT * FROM LANDING_STOCK_VALUES WHERE date >= '{min_date}'"
-            df = pd.read_sql_query(query, self.engine, parse_dates={'date': '%Y-%m-%d'})
-            df['content'] = df['content'].apply(json.loads)
-        else:
-            df = pd.read_sql_table('LANDING_STOCK_VALUES', self.engine, parse_dates={'date': '%Y-%m-%d'})
-
-        return df
+    def get_landing_stock_prices(self) -> pd.DataFrame:
+        return pd.read_sql_table('LANDING_STOCK_VALUES', self.engine)
 
     def get_landing_news_sentiments(self, min_date=None) -> pd.DataFrame:
         if min_date is not None:
