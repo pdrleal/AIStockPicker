@@ -50,7 +50,6 @@ class StockService(IStockService):
                 continue
             self.dates.append(date.date())
 
-    # TODO incluir volume do endpoint de daily_adjusted -> restantes preços estão bem.
     def refresh_landing_data(self):
         def refresh_daily_stock_values(symbol: str, api_key: str):
             total_count = 1
@@ -361,7 +360,7 @@ class StockService(IStockService):
             clean_news_sentiments = clean_news_sentiments(last_recorded_date=last_recorded_date)
             print(f"News sentiment data cleaned.")
             self.load_open_market_dates(clean_news_sentiments['date'].min(), clean_news_sentiments['date'].max())
-            clean_stock_prices = clean_stock_prices(last_recorded_date=last_recorded_date)
+            clean_stock_prices = clean_stock_prices()
             print(f"Stock prices data cleaned.")
             clean_social_sentiments = clean_social_sentiments(last_recorded_date)
             print(f"Social sentiment data cleaned.")
