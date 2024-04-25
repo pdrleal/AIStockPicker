@@ -3,6 +3,7 @@ from dependency_injector import containers, providers
 from src.appservices.stock_service import StockService
 from src.interfaceadapters.controllers.stock_controller import StockController
 from src.interfaceadapters.repositories.constants_repo import ConstantsRepo
+from src.interfaceadapters.repositories.mlflow_repo import MLFlowRepo
 from src.interfaceadapters.repositories.stock_repo import StockRepo
 
 
@@ -20,5 +21,6 @@ class DependencyContainer(containers.DeclarativeContainer):
     constants_repo = providers.Factory(ConstantsRepo)
 
     stock_repo = providers.Factory(StockRepo)
-    stock_service = providers.Factory(StockService, constants_repo=constants_repo, stock_repo=stock_repo)
+    mlflow_repo = providers.Factory(MLFlowRepo)
+    stock_service = providers.Factory(StockService, constants_repo=constants_repo, stock_repo=stock_repo, mlflow_repo=mlflow_repo)
     stock_controller = providers.Factory(StockController, stock_service=stock_service)

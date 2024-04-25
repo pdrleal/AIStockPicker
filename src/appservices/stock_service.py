@@ -8,15 +8,17 @@ from dateutil import rrule
 from dateutil.relativedelta import relativedelta
 
 from src.appservices.irepositories.iconstants_repo import IConstantsRepo
+from src.appservices.irepositories.imlflow_repo import IMLFlowRepo
 from src.appservices.irepositories.istock_repo import IStockRepo
 from src.appservices.iservices.istock_service import IStockService
 
 
 class StockService(IStockService):
 
-    def __init__(self, constants_repo: IConstantsRepo, stock_repo: IStockRepo):
+    def __init__(self, constants_repo: IConstantsRepo, stock_repo: IStockRepo, mlflow_repo: IMLFlowRepo):
         self.constants_repo = constants_repo
         self.stock_repo = stock_repo
+        self.mlflow_repo = mlflow_repo
 
         self.stocks_indices = []
         self.fetch_frequency = None
@@ -205,7 +207,7 @@ class StockService(IStockService):
                 df_temp.index = pd.to_datetime(df_temp.index)
 
                 # add missing times
-                df_temp = df_temp.loc[pd.to_datetime(df_temp.index.date).isin(self.dates)]
+                df_temp = df_temp.loc[df_temp.index.isin(pd.to_datetime(self.dates))]
 
                 if len(df_temp) == 0:
                     continue  # Skip if there is no new data
@@ -233,9 +235,10 @@ class StockService(IStockService):
                                      "8. split coefficient": "split_coefficient"},
                             inplace=True)
             # Adjust the close price for the split coefficient
-            clean_df['close'] = clean_df['close'] * clean_df['split_coefficient']
+            clean_df.loc['close'] = clean_df['close'] * clean_df['split_coefficient']
             clean_df = clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
-            clean_df.reset_index(inplace=True, drop=False, names="datetime")
+            clean_df.reset_index(inplace=True, drop=False, names="date")
+            clean_df.loc['date'] = clean_df['date'].dt.date
             return clean_df
 
         """ Version with twitter and reddit sentiments
@@ -354,8 +357,8 @@ class StockService(IStockService):
         if self.append_to_clean_table:
             # Get the last recorded date from the clean data table
             old_clean_df = self.stock_repo.get_clean_stock_prices()
-            old_clean_df["datetime"] = pd.to_datetime(old_clean_df["datetime"])
-            last_recorded_date = old_clean_df["datetime"].max().date()
+            old_clean_df["date"] = pd.to_datetime(old_clean_df["date"])
+            last_recorded_date = old_clean_df["date"].max().date()
 
             clean_news_sentiments = clean_news_sentiments(last_recorded_date=last_recorded_date)
             print(f"News sentiment data cleaned.")
@@ -372,21 +375,17 @@ class StockService(IStockService):
             clean_social_sentiments = clean_social_sentiments()
             print(f"Social sentiment data cleaned.")
 
-        # merging all dataframes
-        clean_stock_prices['date'] = clean_stock_prices['datetime'].dt.date
-
         clean_df = pd.merge(clean_stock_prices, clean_news_sentiments,
                             on=["date", "stock_index"], how='left')
         clean_df = pd.merge(clean_df, clean_social_sentiments,
                             on=["date", "stock_index"], how='left')
-        clean_df.drop('date', axis=1, inplace=True)
 
         clean_df = clean_df[~clean_df.index.isin(self.market_holidays)]
         # Concat the old and new dataframes
         if self.append_to_clean_table:
             clean_df = pd.concat([old_clean_df, clean_df])
 
-        clean_df = clean_df.sort_values(by=["stock_index", "datetime"])
+        clean_df = clean_df.sort_values(by=["stock_index", "date"])
 
         # Add the cleaned data to the clean data table
         self.stock_repo.replace_clean_table_by(clean_df)
@@ -409,15 +408,40 @@ class StockService(IStockService):
         return None
 
     def forecast_data(self):
-        forecasts = []
+        # Get The Clean DF
+        clean_df = self.stock_repo.get_clean_stock_prices()
         count = 0
-        total_count = len(self.stocks_indices)
         # for stock_index in self.stocks_indices:
-        for stock_index in ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']:
-            print(f"Forecasting {stock_index} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
-            url = f"http://localhost:5001/forecast?stock_index={stock_index}"
-            r = requests.get(url)
-            if r.status_code == 200:
-                forecasts.append(r.json())
+        for stock_index in ['AAPL']:
+            print(f"Fetching Forecast {stock_index} | "
+                  f"{count}:{len(self.stocks_indices)} | "
+                  f"{(count * 100 / len(self.stocks_indices)):.0f} %")
+
+            stock_df = clean_df[clean_df['stock_index'] == stock_index].copy()
+            returns = stock_df['close'].pct_change(fill_method=None)
+            stock_df['return'] = returns
+
+            #last_validation_dates = stock_df.iloc[-43:-1]['date']
+            last_validation_dates = stock_df.iloc[-3:-1]['date']
+
+            real_test_returns = []
+            predicted_test_returns = []
+            for last_validation_date in last_validation_dates:
+                last_validation_date_str = last_validation_date.strftime("%Y-%m-%d")
+                mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
+                                                                                            last_validation_date_str)
+                if mlflow_run is None:
+                    print(f"Forecast not found. Computing 1-day forecast for {stock_index} with data until {last_validation_date_str}...")
+                    url = f"http://localhost:5001/forecast?stock_index={stock_index}&end_date={last_validation_date_str}"
+                    r = requests.get(url)
+                    if r.status_code == 200:
+                        mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
+                                                                                                    last_validation_date_str)
+                    else:
+                        print(f"Error fetching data for {stock_index} on {last_validation_date_str}")
+
+                test_date = pd.to_datetime(mlflow_run.data.tags['predicted_date'])
+                real_test_returns.append(stock_df.loc[stock_df['date'] == test_date, 'return'].values[0])
+                predicted_test_returns.append(float(mlflow_run.data.tags['predicted_return']))
             count += 1
-        return forecasts
+        return real_test_returns + ["|"] + predicted_test_returns

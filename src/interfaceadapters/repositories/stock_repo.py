@@ -76,7 +76,7 @@ class StockRepo(IStockRepo):
         return True
 
     def get_clean_stock_prices(self) -> pd.DataFrame:
-        return pd.read_sql_table('CLEAN_DATA', self.engine)
+        return pd.read_sql_table('CLEAN_DATA', self.engine, parse_dates={'date': '%Y-%m-%d'})
 
     def get_stock_landing_news_sentiments(self, stock_index) -> pd.DataFrame:
         query_params = {'stock_index': stock_index}
