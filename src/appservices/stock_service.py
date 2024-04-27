@@ -190,7 +190,7 @@ class StockService(IStockService):
                              "news_sentiment": avg_score})
 
             clean_df = pd.DataFrame(data)
-            clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
+            clean_df["date"] = pd.to_datetime(clean_df["date"])
             return clean_df
 
         def clean_stock_prices(last_recorded_date=None, cleaned_frequency=self.cleaned_frequency, max_date=None):
@@ -236,10 +236,10 @@ class StockService(IStockService):
                                      "8. split coefficient": "split_coefficient"},
                             inplace=True)
             # Adjust the close price for the split coefficient
-            clean_df.loc['close'] = clean_df['close'] * clean_df['split_coefficient']
+            clean_df['close'] = clean_df['close'] * clean_df['split_coefficient']
             clean_df = clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
             clean_df.reset_index(inplace=True, drop=False, names="date")
-            clean_df.loc['date'] = clean_df['date'].dt.date
+            clean_df["date"] = pd.to_datetime(clean_df["date"])
             return clean_df
 
         """ Version with twitter and reddit sentiments
@@ -350,7 +350,7 @@ class StockService(IStockService):
                     sentiments_data.append(result_dict)
 
             clean_df = pd.DataFrame(sentiments_data)
-            clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
+            clean_df["date"] = pd.to_datetime(clean_df["date"])
             return clean_df
 
         print(f"Cleaning data ...")
@@ -387,6 +387,7 @@ class StockService(IStockService):
             clean_df = pd.concat([old_clean_df, clean_df])
 
         clean_df = clean_df.sort_values(by=["stock_index", "date"])
+        clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
 
         # Add the cleaned data to the clean data table
         self.stock_repo.replace_clean_table_by(clean_df)
