@@ -22,8 +22,7 @@ class StockService(IStockService):
         self.mlflow_repo = mlflow_repo
 
         self.stocks_indices = []
-        self.fetch_frequency = None
-        self.cleaned_frequency = None
+        self.benchmark_index = None
         self.append_to_clean_table = None
         self.market_holidays = []
         self.last_update_date = None
@@ -35,8 +34,7 @@ class StockService(IStockService):
         This method reloads the parameters from the constants table.
         """
         self.stocks_indices = self.constants_repo.get_stocks_indices()
-        self.fetch_frequency = self.constants_repo.get_by_key("Fetch Frequency")
-        self.cleaned_frequency = self.constants_repo.get_by_key("Cleaned Frequency")
+        self.benchmark_index = self.constants_repo.get_by_key("Benchmark Index")
         self.last_update_date = self.constants_repo.get_by_key("Last Update Date")
         self.append_to_clean_table = self.constants_repo.get_by_key("Append to Clean Table") == "True"
         self.market_holidays = [datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -153,7 +151,9 @@ class StockService(IStockService):
             refresh_weekly_social_media_sentiments(symbol, start_date, end_date, finnhub_apikey)
 
             stock_count += 1
-
+        # Refresh S&P500 index
+        print(f"Fetching data for Benchmark: {self.benchmark_index}...")
+        refresh_daily_stock_values(self.benchmark_index, alpha_vantage_apikey)
         return True
 
     def clean_landing_data(self):
@@ -193,7 +193,7 @@ class StockService(IStockService):
             clean_df["date"] = pd.to_datetime(clean_df["date"])
             return clean_df
 
-        def clean_stock_prices(last_recorded_date=None, cleaned_frequency=self.cleaned_frequency, max_date=None):
+        def clean_stock_prices(last_recorded_date=None, max_date=None):
             landing_stock_prices = self.stock_repo.get_landing_stock_prices()
 
             if not self.append_to_clean_table:
@@ -241,68 +241,6 @@ class StockService(IStockService):
             clean_df.reset_index(inplace=True, drop=False, names="date")
             clean_df["date"] = pd.to_datetime(clean_df["date"])
             return clean_df
-
-        """ Version with twitter and reddit sentiments
-
-        def clean_social_sentiments():
-            landing_social_sentiments = self.stock_repo.get_landing_social_sentiments()
-
-            data_reddit = []  # Initialize an empty list to store reddit rows
-            data_twitter = []  # Initialize an empty list to store twitter rows
-            for index, row in landing_social_sentiments.iterrows():
-                daily_reddit = {}
-                daily_twitter = {}
-                # create dataframe with stock values
-                for reddit_sentiment in row["content"]["reddit"]:
-                    date = pd.to_datetime(reddit_sentiment["atTime"], format='%Y-%m-%d %H:%M:%S').date()
-
-                    # Skip the sentiment if the date is the 6th day (saturday)
-                    if (date == pd.to_datetime(row['end_date']).date() or
-                        (self.append_to_clean_table and date <= last_recorded_date)):
-                        continue
-
-                    # Initialize a list for the date if it doesn't exist in daily_info
-                    if date not in daily_reddit:
-                        daily_reddit[date] = []
-                    # Append the Reddit sentiment score to the list
-                    daily_reddit[date].append(float(reddit_sentiment["score"]))
-
-                for twitter_sentiment in row["content"]["twitter"]:
-                    date = pd.to_datetime(twitter_sentiment["atTime"], format='%Y-%m-%d %H:%M:%S').date()
-
-                    # Skip the sentiment if the date is the 6th day (saturday)
-                    if (date == pd.to_datetime(row['end_date']).date() or
-                        (self.append_to_clean_table and date <= last_recorded_date)):
-                        continue
-
-                    # Initialize a list for the date if it doesn't exist in daily_info
-                    if date not in daily_twitter:
-                        daily_twitter[date] = []
-                    # Append the Reddit sentiment score to the list
-                    daily_twitter[date].append(float(twitter_sentiment["score"]))
-
-                # Calculate the average score for each date and create dictionaries
-                for date, scores in daily_reddit.items():
-                    avg_score = sum(scores) / len(scores)
-                    result_dict = {"date": date, "stock_index": row["stock_index"], "reddit_sentiment": avg_score}
-                    data_reddit.append(result_dict)
-                for date, scores in daily_twitter.items():
-                    avg_score = sum(scores) / len(scores)
-                    result_dict = {"date": date, "stock_index": row["stock_index"], "twitter_sentiment": avg_score}
-                    data_twitter.append(result_dict)
-
-            # Create DataFrames from the lists
-            reddit_df = pd.DataFrame(data_reddit)
-            twitter_df = pd.DataFrame(data_twitter)
-
-            # Merge the DataFrames on 'date' and 'stock_index'
-            clean_df = pd.merge(reddit_df, twitter_df, on=['date', 'stock_index'], how='outer')
-
-            clean_df["date"] = pd.to_datetime(clean_df["date"]).dt.date
-
-            return clean_df
-
-        """
 
         def clean_social_sentiments(last_recorded_date=None):
             # set last_recorded_date to the previous monday
