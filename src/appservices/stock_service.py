@@ -11,6 +11,7 @@ from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 from src.appservices.irepositories.imlflow_repo import IMLFlowRepo
 from src.appservices.irepositories.istock_repo import IStockRepo
 from src.appservices.iservices.istock_service import IStockService
+from src.utils.utils import generate_scores_from_returns
 
 
 class StockService(IStockService):
@@ -411,8 +412,8 @@ class StockService(IStockService):
         # Get The Clean DF
         clean_df = self.stock_repo.get_clean_stock_prices()
         count = 0
-        # for stock_index in self.stocks_indices:
-        for stock_index in ['AAPL']:
+        final_scores = {}
+        for stock_index in self.stocks_indices:
             print(f"Fetching Forecast {stock_index} | "
                   f"{count}:{len(self.stocks_indices)} | "
                   f"{(count * 100 / len(self.stocks_indices)):.0f} %")
@@ -421,17 +422,18 @@ class StockService(IStockService):
             returns = stock_df['close'].pct_change(fill_method=None)
             stock_df['return'] = returns
 
-            #last_validation_dates = stock_df.iloc[-43:-1]['date']
-            last_validation_dates = stock_df.iloc[-3:-1]['date']
+            last_validation_dates = stock_df.iloc[-43:-1]['date']
 
             real_test_returns = []
             predicted_test_returns = []
             for last_validation_date in last_validation_dates:
                 last_validation_date_str = last_validation_date.strftime("%Y-%m-%d")
+                print(f"-------------------------{last_validation_date_str}")
                 mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
                                                                                             last_validation_date_str)
                 if mlflow_run is None:
-                    print(f"Forecast not found. Computing 1-day forecast for {stock_index} with data until {last_validation_date_str}...")
+                    print(
+                        f"Forecast not found. Computing 1-day forecast for {stock_index} with data until {last_validation_date_str}...")
                     url = f"http://localhost:5001/forecast?stock_index={stock_index}&end_date={last_validation_date_str}"
                     r = requests.get(url)
                     if r.status_code == 200:
@@ -444,4 +446,10 @@ class StockService(IStockService):
                 real_test_returns.append(stock_df.loc[stock_df['date'] == test_date, 'return'].values[0])
                 predicted_test_returns.append(float(mlflow_run.data.tags['predicted_return']))
             count += 1
-        return real_test_returns + ["|"] + predicted_test_returns
+            stock_info = {
+                'real_test_returns': real_test_returns,
+                'predicted_test_returns': predicted_test_returns,
+                'scores': generate_scores_from_returns(real_test_returns, predicted_test_returns)
+            }
+            final_scores[stock_index] = stock_info
+        return final_scores
