@@ -24,6 +24,13 @@ def forecast_stock_blueprint(controller: IStockController = Provide[DependencyCo
     return response
 
 
+@blueprint.route("/build_portfolio", methods=["GET"])
+@inject
+def build_portfolio_stock_blueprint(controller: IStockController = Provide[DependencyContainer.stock_controller]):
+    response = controller.build_portfolio(request.args)
+    return response
+
+
 @blueprint.route("/test_performance", methods=["GET"])
 @inject
 def test_performance_stock_blueprint(controller: IStockController = Provide[DependencyContainer.stock_controller]):

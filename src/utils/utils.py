@@ -23,17 +23,21 @@ def available_evaluation_metrics() -> dict:
     return metrics
 
 
-def information_ratio(strategy_returns) -> float:
+def information_ratio(strategy_returns, benchmark_returns = None) -> float:
     """
     Calculate the Information Ratio (IR).
 
     Arguments:
         strategy_returns: Strategy returns
+        benchmark_returns: Benchmark returns
 
     Returns:
         IR: Information Ratio (IR)
     """
-    return (np.mean(strategy_returns) / np.std(strategy_returns)) if np.std(strategy_returns) != 0 else 0
+    if benchmark_returns is None:
+        benchmark_returns = np.zeros(len(strategy_returns))
+
+    return ((np.mean(strategy_returns) - np.mean(benchmark_returns)) / np.std(strategy_returns)) if np.std(strategy_returns) != 0 else 0
 
 
 def generate_scores_from_returns(true_returns, predicted_returns) -> dict:

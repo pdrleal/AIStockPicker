@@ -33,6 +33,17 @@ class StockController(IStockController):
         result = self.stock_service.forecast_data(stock_index, current_date)
         return Response(json.dumps(result, cls=EnhancedJSONEncoder), mimetype='application/json')
 
+    def build_portfolio(self, request_args: dict):
+        current_date = request_args.get('current_date')
+        if current_date is None:
+            current_date = datetime.now()
+        elif re.match(r"^\d{4}-\d{2}-\d{2}$", current_date) is not None:
+            current_date = datetime.strptime(current_date, "%Y-%m-%d")
+        else:
+            return "Invalid date parameter. Date format must be yyyy-mm-dd.", 400
+
+        result = self.stock_service.build_portfolio(current_date)
+        return Response(json.dumps(result, cls=EnhancedJSONEncoder), mimetype='application/json')
     def test_performance(self, request_args: dict):
         start_date = request_args.get('start_date')
         end_date = request_args.get('end_date')

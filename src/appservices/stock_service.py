@@ -10,7 +10,7 @@ from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 from src.appservices.irepositories.imlflow_repo import IMLFlowRepo
 from src.appservices.irepositories.istock_repo import IStockRepo
 from src.appservices.iservices.istock_service import IStockService
-from src.utils.utils import generate_scores_from_returns
+from src.utils.utils import generate_scores_from_returns, information_ratio
 
 
 class StockService(IStockService):
@@ -22,6 +22,7 @@ class StockService(IStockService):
 
         self.stocks_indices = []
         self.benchmark_index = None
+        self.portfolio_size = None
         self.append_to_clean_table = None
         self.market_holidays = []
         self.last_update_date = None
@@ -34,9 +35,10 @@ class StockService(IStockService):
         """
         self.stocks_indices = self.constants_repo.get_stocks_indices()
         self.benchmark_index = self.constants_repo.get_by_key("Benchmark Index")
+        self.portfolio_size = int(self.constants_repo.get_by_key("Portfolio Size"))
         self.last_update_date = self.constants_repo.get_by_key("Last Update Date")
         self.append_to_clean_table = self.constants_repo.get_by_key("Append to Clean Table") == "True"
-        self.market_holidays = [datetime.strptime(date_str, "%Y-%m-%d").date()
+        self.market_holidays = [datetime.strptime(date_str, "%Y-%m-%d")
                                 for date_str in self.constants_repo.get_by_key("Market Holidays").split(",")]
 
         if self.last_update_date is not None:
@@ -44,11 +46,13 @@ class StockService(IStockService):
                                                       '%Y-%m-%d %H:%M:%S')
 
     def get_open_market_dates(self, start_date, end_date):
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
         dates = []
         for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
-            if date.weekday() in [5, 6] or date.date() in self.market_holidays:
+            if date.weekday() in [5, 6] or date in self.market_holidays:
                 continue
-            dates.append(date.date())
+            dates.append(date)
         return dates
 
     def load_open_market_dates(self, start_date, end_date):
@@ -72,8 +76,7 @@ class StockService(IStockService):
             count += 1
             print(f"Stocks prices | {symbol} | {count}:{total_count} | {(count * 100 / total_count):.0f} %")
 
-        def refresh_daily_news_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date,
-                                          api_key: str):
+        def refresh_daily_news_sentiments(symbol: str, start_date: datetime, end_date: datetime, api_key: str):
             self.load_open_market_dates(start_date, end_date)
             total_count = len(self.dates)
             count = 0
@@ -91,10 +94,10 @@ class StockService(IStockService):
                 data = r.json()
                 self.stock_repo.add_landing_news_sentiments(symbol, date.strftime("%Y-%m-%d"), data)
 
-                count += 1;
+                count += 1
                 print(f"News Sentiment | {symbol} | {count}/{total_count} | {(count * 100 / total_count):.0f} %")
 
-        def refresh_weekly_social_media_sentiments(symbol: str, start_date: datetime.date, end_date: datetime.date,
+        def refresh_weekly_social_media_sentiments(symbol: str, start_date: datetime, end_date: datetime,
                                                    api_key: str):
             symbol_transformed = symbol.replace('-', '.')
             # adjust date to monday
@@ -129,16 +132,20 @@ class StockService(IStockService):
 
         if self.last_update_date is None:
             # start from the beginning - 19 months
-            start_date = datetime.now().date() - relativedelta(months=20)
+            start_date = datetime.now() - relativedelta(months=20)
         else:
             # start from the day before the last update date
-            start_date = self.last_update_date.date() - timedelta(days=1)
+            start_date = self.last_update_date - timedelta(days=1)
 
         # if market still open, use data from the day before
         if datetime.now(tz=pytz.timezone('US/Eastern')).hour < 17:
-            end_date = datetime.now().date() - timedelta(days=1)
+            end_date = datetime.now() - timedelta(days=1)
         else:
-            end_date = datetime.now().date()
+            end_date = datetime.now()
+
+        # Reset Time to 00:00:00
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         print(f"Start date: {start_date}| End date: {end_date}")
         print()
@@ -169,7 +176,8 @@ class StockService(IStockService):
                 landing_news_sentiments = self.stock_repo.get_landing_news_sentiments()
             data = []  # Initialize an empty list to store rows
             for index, row in landing_news_sentiments.iterrows():
-                if self.append_to_clean_table and row["date"].date() <= last_recorded_date:
+                if self.append_to_clean_table and row["date"].replace(hour=0, minute=0, second=0,
+                                                                      microsecond=0) <= last_recorded_date:
                     continue
 
                 score = 0
@@ -189,7 +197,8 @@ class StockService(IStockService):
                 else:
                     avg_score = score / num_articles
 
-                data.append({"date": row["date"].date(), "stock_index": row["stock_index"],
+                data.append({"date": row["date"].replace(hour=0, minute=0, second=0, microsecond=0),
+                             "stock_index": row["stock_index"],
                              "news_sentiment": avg_score})
 
             clean_df = pd.DataFrame(data)
@@ -200,7 +209,7 @@ class StockService(IStockService):
             landing_stock_prices = self.stock_repo.get_landing_stock_prices()
 
             if not self.append_to_clean_table:
-                self.load_open_market_dates(datetime(2021, 7, 1).date(), max_date)
+                self.load_open_market_dates(datetime(2021, 7, 1), max_date)
             df_list = []  # Initialize an empty list to store DataFrames
             for index, row in landing_stock_prices.iterrows():
                 # create dataframe with stock values
@@ -211,7 +220,7 @@ class StockService(IStockService):
                 df_temp.index = pd.to_datetime(df_temp.index)
 
                 # add missing times
-                df_temp = df_temp.loc[df_temp.index.isin(pd.to_datetime(self.dates))]
+                df_temp = df_temp.loc[df_temp.index.isin(self.dates)]
 
                 if len(df_temp) == 0:
                     continue  # Skip if there is no new data
@@ -253,15 +262,16 @@ class StockService(IStockService):
 
             sentiments_data = []
             for index, row in landing_social_sentiments.iterrows():
-                start_date = pd.to_datetime(row["start_date"]).date()
-                end_date = pd.to_datetime(row["end_date"]).date()
+                start_date = pd.to_datetime(row["start_date"])
+                end_date = pd.to_datetime(row["end_date"])
 
                 daily_sentiment = {}
                 sorted_data = sorted(row["content"]["data"], key=lambda x: x["atTime"])
                 # create dataframe with stock values
                 for sentiment in sorted_data:
 
-                    date = pd.to_datetime(sentiment["atTime"], format='%Y-%m-%d %H:%M:%S').date()
+                    date = (pd.to_datetime(sentiment["atTime"], format='%Y-%m-%d %H:%M:%S').
+                            replace(hour=0, minute=0, second=0, microsecond=0))
                     # Skip the sentiment if the date is the 6th day (saturday)
                     if date.weekday() > 4 or (self.append_to_clean_table and date <= last_recorded_date):
                         continue
@@ -274,8 +284,8 @@ class StockService(IStockService):
                 # Iterate through dates
                 current_date = start_date
                 while current_date < end_date:
-                    if current_date.weekday() > 4 or current_date in daily_sentiment.keys() or \
-                        (self.append_to_clean_table and current_date <= last_recorded_date):
+                    if (current_date.weekday() > 4 or current_date in daily_sentiment.keys() or
+                        (self.append_to_clean_table and current_date <= last_recorded_date)):
                         current_date += timedelta(days=1)
                         continue
                     daily_sentiment[current_date] = []
@@ -300,7 +310,7 @@ class StockService(IStockService):
             # Get the last recorded date from the clean data table
             old_clean_df = self.stock_repo.get_clean_stock_prices()
             old_clean_df["date"] = pd.to_datetime(old_clean_df["date"])
-            last_recorded_date = old_clean_df["date"].max().date()
+            last_recorded_date = old_clean_df["date"].max()
 
             clean_news_sentiments = clean_news_sentiments(last_recorded_date=last_recorded_date)
             print(f"News sentiment data cleaned.")
@@ -351,22 +361,23 @@ class StockService(IStockService):
         return None
 
     def forecast_data(self, stock_index: str, current_date: datetime):
-        current_date = self.get_open_market_dates(current_date - timedelta(days=10), current_date.date())[-1]
+        current_date = self.get_open_market_dates(current_date - timedelta(days=10), current_date)[-1]
         current_date_str = current_date.strftime("%Y-%m-%d")
 
-        print(f"Fetching Forecast data for {stock_index} on Current Date({current_date_str})...")
+        print(f"Fetching Forecast data for {stock_index} - Current Date({current_date_str})...")
 
-        mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index, current_date_str)
+        mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_current_date(stock_index, current_date_str)
         if mlflow_run is None:
             print(
                 f"Forecast not found. Computing 1-day forecast for {stock_index} with data until {current_date_str}...")
-            url = f"http://localhost:5001/forecast?stock_index={stock_index}&end_date={current_date_str}"
+            url = f"http://localhost:5001/forecast?stock_index={stock_index}&current_date={current_date_str}"
             r = requests.get(url)
             if r.status_code == 200:
-                mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
-                                                                                            current_date_str)
+                mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_current_date(stock_index,current_date_str)
+                if mlflow_run is None:
+                    raise Exception(f"Error fetching data for {stock_index} on {current_date_str}")
             else:
-                return f"Error fetching data for {stock_index} on {current_date_str}", 500
+                return Exception(f"Error forecasting {stock_index} on {current_date_str}")
 
         predicted_date = mlflow_run.data.tags['predicted_date']
         predicted_signal = mlflow_run.data.tags['predicted_signal']
@@ -379,40 +390,75 @@ class StockService(IStockService):
             'predicted_signal': predicted_signal,
             'predicted_return': predicted_return,
             'predicted_close_price': predicted_close_price,
+            'information_ratio': metrics['information_ratio'],
             'metrics': metrics
         }
 
+    def build_portfolio(self, current_date: datetime):
+        current_date = self.get_open_market_dates(current_date - timedelta(days=10), current_date)[-1]
+        current_date_str = current_date.strftime("%Y-%m-%d")
+
+        print(f"Building Portfolio - Current Date({current_date_str})...")
+
+        portfolio_selected_stocks = []
+        all_forecast_details = []
+        # Retrieve forecast details for each stock
+        for stock_index in self.stocks_indices:
+            forecast_details = self.forecast_data(stock_index, current_date)
+            all_forecast_details.append(forecast_details)
+        # Order forecast details by information ratio
+        all_forecast_details = sorted(all_forecast_details, key=lambda x: x['information_ratio'], reverse=True)
+        # Build the portfolio with {self.portfolio_size} stocks with the highest information ratio
+        for forecast_details in all_forecast_details:
+            if forecast_details['predicted_signal'] == 'Buy':
+                portfolio_selected_stocks.append(forecast_details['stock_index'])
+            if len(portfolio_selected_stocks) == self.portfolio_size:
+                break
+
+        return portfolio_selected_stocks
+
     def test_performance(self, start_date: datetime, end_date: datetime):
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+        print(
+            f"Testing Portfolio System Performance Against Benchmark(${self.benchmark_index}) - Start Date({start_date_str}) | End Date({end_date_str})...")
 
         clean_df = self.stock_repo.get_clean_stock_prices()
-        count = 0
-        final_scores = {}
 
-        for stock_index in self.stocks_indices:
-            print(f"Performance Test | {stock_index} | "
-                  f"{count}:{len(self.stocks_indices)} | "
-                  f"{(count * 100 / len(self.stocks_indices)):.0f} %")
+        benchmark_df = clean_df[clean_df['stock_index'] == self.benchmark_index].copy()
+        returns = benchmark_df['close'].pct_change(fill_method=None)
+        benchmark_df['return'] = returns
 
-            stock_df = clean_df[clean_df['stock_index'] == stock_index].copy()
-            returns = stock_df['close'].pct_change(fill_method=None)
-            stock_df['return'] = returns
+        test_dates = self.get_open_market_dates(start_date, end_date)
+        benchmark_returns = []
+        portfolio_strategy_returns = []
+        selected_stocks_by_date = {}
+        for test_date in test_dates:
+            benchmark_returns.append(benchmark_df.loc[benchmark_df['date'] == test_date, 'return'].values[0])
 
-            last_validation_dates = stock_df.loc[(stock_df['date'] >= start_date) & (stock_df['date'] <= end_date), 'date']
+            selected_stocks = self.build_portfolio(test_date - timedelta(days=1))
+            selected_stocks_by_date[test_date.strftime("%Y-%m-%d")] = selected_stocks
+            portfolio_yield = 0
+            for stock_index in selected_stocks:
+                stock_df = clean_df[clean_df['stock_index'] == stock_index].copy()
+                returns = stock_df['close'].pct_change(fill_method=None)
+                stock_df['return'] = returns
+                portfolio_yield += stock_df.loc[stock_df['date'] == test_date, 'return'].values[0]
+            portfolio_strategy_returns.append(portfolio_yield)
+        benchmark_yield = sum(benchmark_returns)
+        benchmark_information_ratio = information_ratio(benchmark_returns)
+        portfolio_strategy_yield = sum(portfolio_strategy_returns)
+        portfolio_strategy_information_ratio_no_benchmark = information_ratio(portfolio_strategy_returns)
+        portfolio_strategy_information_ratio_with_benchmark = information_ratio(portfolio_strategy_returns,
+                                                                                benchmark_returns)
 
-            real_test_returns = []
-            predicted_test_returns = []
-            for last_validation_date in last_validation_dates:
-                forecast_data = self.forecast_data(stock_index, last_validation_date)
-                last_validation_date_str = last_validation_date.strftime("%Y-%m-%d")
-            """
-                test_date = pd.to_datetime(mlflow_run.data.tags['predicted_date'])
-                real_test_returns.append(stock_df.loc[stock_df['date'] == test_date, 'return'].values[0])
-                predicted_test_returns.append(float(mlflow_run.data.tags['predicted_return']))
-            count += 1
-            stock_info = {
-                'real_test_returns': real_test_returns,
-                'predicted_test_returns': predicted_test_returns,
-                'scores': generate_scores_from_returns(real_test_returns, predicted_test_returns)
-            }
-            final_scores[stock_index] = stock_info"""
-        return final_scores
+        response = {
+            'Benchmark': self.benchmark_index,
+            'Benchmark Yield': benchmark_yield,
+            'Benchmark Information Ratio': benchmark_information_ratio,
+            'Portfolio Strategy': selected_stocks_by_date,
+            'Portfolio Strategy Yield': portfolio_strategy_yield,
+            'Portfolio Strategy Information Ratio (No Benchmark)': portfolio_strategy_information_ratio_no_benchmark,
+            'Portfolio Strategy Information Ratio (With Benchmark)': portfolio_strategy_information_ratio_with_benchmark
+        }
+        return response

@@ -18,10 +18,10 @@ class MLFlowRepo(IMLFlowRepo):
         mlflow.set_tracking_uri(f'mysql://{user}:{password}@{host}:{port}/{db_name}')
         mlflow.set_experiment(experiment_name)
 
-    def get_stock_mlflow_run_for_last_validation_date(self, stock_index: str, last_validation_date_str: str):
+    def get_stock_mlflow_run_for_current_date(self, stock_index: str, current_date_str: str):
         runs_df = mlflow.search_runs(search_all_experiments=True,
                                      filter_string=f"tags.stock_index = '{stock_index}' "
-                                                   f"AND tags.last_validation_date = '{last_validation_date_str}'",
+                                                   f"AND tags.current_date = '{current_date_str}'",
                                      order_by=["tags.run_timestamp DESC"])
         if runs_df.empty:
             return None

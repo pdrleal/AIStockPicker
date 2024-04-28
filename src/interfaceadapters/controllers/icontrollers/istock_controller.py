@@ -12,5 +12,9 @@ class IStockController(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def build_portfolio(self, request_args: dict):
+        pass
+
+    @abc.abstractmethod
     def test_performance(self, request_args: dict):
         pass
