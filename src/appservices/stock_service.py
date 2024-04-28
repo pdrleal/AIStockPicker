@@ -6,7 +6,6 @@ import pytz
 import requests
 from dateutil import rrule
 from dateutil.relativedelta import relativedelta
-
 from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 from src.appservices.irepositories.imlflow_repo import IMLFlowRepo
 from src.appservices.irepositories.istock_repo import IStockRepo
@@ -44,12 +43,16 @@ class StockService(IStockService):
             self.last_update_date = datetime.strptime(self.constants_repo.get_by_key("Last Update Date"),
                                                       '%Y-%m-%d %H:%M:%S')
 
-    def load_open_market_dates(self, start_date, end_date):
-        self.dates = []
+    def get_open_market_dates(self, start_date, end_date):
+        dates = []
         for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date):
             if date.weekday() in [5, 6] or date.date() in self.market_holidays:
                 continue
-            self.dates.append(date.date())
+            dates.append(date.date())
+        return dates
+
+    def load_open_market_dates(self, start_date, end_date):
+        self.dates = self.get_open_market_dates(start_date, end_date)
 
     def refresh_landing_data(self):
         def refresh_daily_stock_values(symbol: str, api_key: str):
@@ -347,13 +350,46 @@ class StockService(IStockService):
 
         return None
 
-    def forecast_data(self):
-        # Get The Clean DF
+    def forecast_data(self, stock_index: str, current_date: datetime):
+        current_date = self.get_open_market_dates(current_date - timedelta(days=10), current_date.date())[-1]
+        current_date_str = current_date.strftime("%Y-%m-%d")
+
+        print(f"Fetching Forecast data for {stock_index} on Current Date({current_date_str})...")
+
+        mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index, current_date_str)
+        if mlflow_run is None:
+            print(
+                f"Forecast not found. Computing 1-day forecast for {stock_index} with data until {current_date_str}...")
+            url = f"http://localhost:5001/forecast?stock_index={stock_index}&end_date={current_date_str}"
+            r = requests.get(url)
+            if r.status_code == 200:
+                mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
+                                                                                            current_date_str)
+            else:
+                return f"Error fetching data for {stock_index} on {current_date_str}", 500
+
+        predicted_date = mlflow_run.data.tags['predicted_date']
+        predicted_signal = mlflow_run.data.tags['predicted_signal']
+        predicted_return = float(mlflow_run.data.tags['predicted_return'])
+        predicted_close_price = float(mlflow_run.data.tags['predicted_close_price'])
+        metrics = mlflow_run.data.metrics
+        return {
+            'stock_index': stock_index,
+            'predicted_date': predicted_date,
+            'predicted_signal': predicted_signal,
+            'predicted_return': predicted_return,
+            'predicted_close_price': predicted_close_price,
+            'metrics': metrics
+        }
+
+    def test_performance(self, start_date: datetime, end_date: datetime):
+
         clean_df = self.stock_repo.get_clean_stock_prices()
         count = 0
         final_scores = {}
+
         for stock_index in self.stocks_indices:
-            print(f"Fetching Forecast {stock_index} | "
+            print(f"Performance Test | {stock_index} | "
                   f"{count}:{len(self.stocks_indices)} | "
                   f"{(count * 100 / len(self.stocks_indices)):.0f} %")
 
@@ -361,26 +397,14 @@ class StockService(IStockService):
             returns = stock_df['close'].pct_change(fill_method=None)
             stock_df['return'] = returns
 
-            last_validation_dates = stock_df.iloc[-43:-1]['date']
+            last_validation_dates = stock_df.loc[(stock_df['date'] >= start_date) & (stock_df['date'] <= end_date), 'date']
 
             real_test_returns = []
             predicted_test_returns = []
             for last_validation_date in last_validation_dates:
+                forecast_data = self.forecast_data(stock_index, last_validation_date)
                 last_validation_date_str = last_validation_date.strftime("%Y-%m-%d")
-                print(f"-------------------------{last_validation_date_str}")
-                mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
-                                                                                            last_validation_date_str)
-                if mlflow_run is None:
-                    print(
-                        f"Forecast not found. Computing 1-day forecast for {stock_index} with data until {last_validation_date_str}...")
-                    url = f"http://localhost:5001/forecast?stock_index={stock_index}&end_date={last_validation_date_str}"
-                    r = requests.get(url)
-                    if r.status_code == 200:
-                        mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_last_validation_date(stock_index,
-                                                                                                    last_validation_date_str)
-                    else:
-                        print(f"Error fetching data for {stock_index} on {last_validation_date_str}")
-
+            """
                 test_date = pd.to_datetime(mlflow_run.data.tags['predicted_date'])
                 real_test_returns.append(stock_df.loc[stock_df['date'] == test_date, 'return'].values[0])
                 predicted_test_returns.append(float(mlflow_run.data.tags['predicted_return']))
@@ -390,5 +414,5 @@ class StockService(IStockService):
                 'predicted_test_returns': predicted_test_returns,
                 'scores': generate_scores_from_returns(real_test_returns, predicted_test_returns)
             }
-            final_scores[stock_index] = stock_info
+            final_scores[stock_index] = stock_info"""
         return final_scores

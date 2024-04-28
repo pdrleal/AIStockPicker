@@ -1,5 +1,8 @@
+import re
+from datetime import datetime
+
 from dependency_injector.wiring import inject, Provide
-from flask import Blueprint
+from flask import Blueprint, request
 
 from application.dependency_container import DependencyContainer
 from src.interfaceadapters.controllers.icontrollers.istock_controller import IStockController
@@ -17,5 +20,12 @@ def refresh_stock_blueprint(controller: IStockController = Provide[DependencyCon
 @blueprint.route("/forecast", methods=["GET"])
 @inject
 def forecast_stock_blueprint(controller: IStockController = Provide[DependencyContainer.stock_controller]):
-    response = controller.forecast_data()
+    response = controller.forecast_data(request.args)
+    return response
+
+
+@blueprint.route("/test_performance", methods=["GET"])
+@inject
+def test_performance_stock_blueprint(controller: IStockController = Provide[DependencyContainer.stock_controller]):
+    response = controller.test_performance(request.args)
     return response
