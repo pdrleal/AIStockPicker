@@ -23,7 +23,20 @@ def available_evaluation_metrics() -> dict:
     return metrics
 
 
-def information_ratio(strategy_returns, benchmark_returns = None) -> float:
+def accumulative_returns(returns) -> list:
+    """
+    Calculate the accumulative returns.
+
+    Arguments:
+        returns: Returns
+
+    Returns:
+        accumulative_returns: Accumulative returns
+    """
+    return np.cumprod(1 + np.array(returns)) - 1
+
+
+def information_ratio(strategy_returns, benchmark_returns=None) -> float:
     """
     Calculate the Information Ratio (IR).
 
@@ -37,7 +50,8 @@ def information_ratio(strategy_returns, benchmark_returns = None) -> float:
     if benchmark_returns is None:
         benchmark_returns = np.zeros(len(strategy_returns))
 
-    return ((np.mean(strategy_returns) - np.mean(benchmark_returns)) / np.std(strategy_returns)) if np.std(strategy_returns) != 0 else 0
+    return ((np.mean(strategy_returns) - np.mean(benchmark_returns)) / np.std(strategy_returns)) if np.std(
+        strategy_returns) != 0 else 0
 
 
 def generate_scores_from_returns(true_returns, predicted_returns) -> dict:

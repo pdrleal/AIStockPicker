@@ -10,7 +10,7 @@ from src.appservices.irepositories.iconstants_repo import IConstantsRepo
 from src.appservices.irepositories.imlflow_repo import IMLFlowRepo
 from src.appservices.irepositories.istock_repo import IStockRepo
 from src.appservices.iservices.istock_service import IStockService
-from src.utils.utils import generate_scores_from_returns, information_ratio
+from src.utils.utils import generate_scores_from_returns, information_ratio, accumulative_returns
 
 
 class StockService(IStockService):
@@ -438,26 +438,27 @@ class StockService(IStockService):
 
             selected_stocks = self.build_portfolio(test_date - timedelta(days=1))
             selected_stocks_by_date[test_date.strftime("%Y-%m-%d")] = selected_stocks
-            portfolio_yield = 0
+            daily_portfolio_returns = []
             for stock_index in selected_stocks:
                 stock_df = clean_df[clean_df['stock_index'] == stock_index].copy()
                 returns = stock_df['close'].pct_change(fill_method=None)
                 stock_df['return'] = returns
-                portfolio_yield += stock_df.loc[stock_df['date'] == test_date, 'return'].values[0]
-            portfolio_strategy_returns.append(portfolio_yield)
-        benchmark_yield = sum(benchmark_returns)
+                daily_portfolio_returns.append(stock_df.loc[stock_df['date'] == test_date, 'return'].values[0])
+
+            portfolio_strategy_returns.append(np.mean(daily_portfolio_returns))
+        benchmark_accumulative_returns = accumulative_returns(benchmark_returns)[-1]
         benchmark_information_ratio = information_ratio(benchmark_returns)
-        portfolio_strategy_yield = sum(portfolio_strategy_returns)
+        portfolio_strategy_accumulative_returns = accumulative_returns(portfolio_strategy_returns)[-1]
         portfolio_strategy_information_ratio_no_benchmark = information_ratio(portfolio_strategy_returns)
         portfolio_strategy_information_ratio_with_benchmark = information_ratio(portfolio_strategy_returns,
                                                                                 benchmark_returns)
 
         response = {
             'Benchmark': self.benchmark_index,
-            'Benchmark Yield': benchmark_yield,
+            'Benchmark Accumulative Returns': benchmark_accumulative_returns,
             'Benchmark Information Ratio': benchmark_information_ratio,
             'Portfolio Strategy': selected_stocks_by_date,
-            'Portfolio Strategy Yield': portfolio_strategy_yield,
+            'Portfolio Strategy Accumulative Returns': portfolio_strategy_accumulative_returns,
             'Portfolio Strategy Information Ratio (No Benchmark)': portfolio_strategy_information_ratio_no_benchmark,
             'Portfolio Strategy Information Ratio (With Benchmark)': portfolio_strategy_information_ratio_with_benchmark
         }
