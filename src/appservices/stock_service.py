@@ -364,7 +364,7 @@ class StockService(IStockService):
         current_date = self.get_open_market_dates(current_date - timedelta(days=10), current_date)[-1]
         current_date_str = current_date.strftime("%Y-%m-%d")
 
-        print(f"Fetching Forecast data for {stock_index} - Current Date({current_date_str})...")
+        print(f"{datetime.now()} | Fetching Forecast data for {stock_index} - Current Date({current_date_str})...")
 
         mlflow_run = self.mlflow_repo.get_stock_mlflow_run_for_current_date(stock_index, current_date_str)
         if mlflow_run is None:
