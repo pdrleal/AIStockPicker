@@ -377,7 +377,7 @@ class StockService(IStockService):
                 if mlflow_run is None:
                     raise Exception(f"Error fetching data for {stock_index} on {current_date_str}")
             else:
-                return Exception(f"Error forecasting {stock_index} on {current_date_str}")
+                raise Exception(f"Error forecasting {stock_index} on {current_date_str}")
 
         predicted_date = mlflow_run.data.tags['predicted_date']
         predicted_signal = mlflow_run.data.tags['predicted_signal']
