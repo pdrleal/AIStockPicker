@@ -1,0 +1,16 @@
+DROP TABLE IF EXISTS mlflow.alembic_version;
+DROP TABLE IF EXISTS mlflow.registered_model_tags;
+DROP TABLE IF EXISTS mlflow.registered_model_aliases;
+DROP TABLE IF EXISTS mlflow.model_version_tags;
+DROP TABLE IF EXISTS mlflow.model_versions;
+DROP TABLE IF EXISTS mlflow.registered_models;
+DROP TABLE IF EXISTS mlflow.inputs;
+DROP TABLE IF EXISTS mlflow.datasets;
+DROP TABLE IF EXISTS mlflow.input_tags;
+DROP TABLE IF EXISTS mlflow.experiment_tags;
+DROP TABLE IF EXISTS mlflow.tags;
+DROP TABLE IF EXISTS mlflow.params;
+DROP TABLE IF EXISTS mlflow.metrics;
+DROP TABLE IF EXISTS mlflow.latest_metrics;
+DROP TABLE IF EXISTS mlflow.runs;
+DROP TABLE IF EXISTS mlflow.experiments;

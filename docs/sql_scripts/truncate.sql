@@ -1,0 +1,3 @@
+TRUNCATE `AIStockPicker`.`LANDING_NEWS_SENTIMENT`;
+TRUNCATE `AIStockPicker`.`LANDING_STOCK_VALUES`;
+UPDATE `AIStockPicker`.`VARIABLES` SET `value` = NULL WHERE (`key` = 'Last Update Date');
