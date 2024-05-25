@@ -244,11 +244,17 @@ class StockService(IStockService):
                                      "2. high": "high",
                                      "3. low": "low",
                                      "4. close": "close",
-                                     "6. volume": "volume",
-                                     "8. split coefficient": "split_coefficient"},
+                                     "5. adjusted close": "adj_close",
+                                     "6. volume": "volume"},
                             inplace=True)
+
             # Adjust the close price for the split coefficient
-            clean_df['close'] = clean_df['close'] * clean_df['split_coefficient']
+            clean_df['split_coefficient'] = clean_df['close'] / clean_df['adj_close']
+            clean_df['open'] = clean_df['open'] / clean_df['split_coefficient']
+            clean_df['high'] = clean_df['high'] / clean_df['split_coefficient']
+            clean_df['low'] = clean_df['low'] / clean_df['split_coefficient']
+            clean_df['close'] = clean_df['close'] / clean_df['split_coefficient']
+            clean_df = clean_df.round({'open': 2, 'high': 2, 'low': 2, 'close': 2})
             clean_df = clean_df[["stock_index", "open", "high", "low", "close", "volume"]]
             clean_df.reset_index(inplace=True, drop=False, names="date")
             clean_df["date"] = pd.to_datetime(clean_df["date"])
