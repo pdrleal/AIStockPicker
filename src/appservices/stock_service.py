@@ -22,7 +22,6 @@ class StockService(IStockService):
 
         self.stocks_indices = []
         self.benchmark_index = None
-        self.portfolio_size = None
         self.append_to_clean_table = None
         self.market_holidays = []
         self.last_update_date = None
@@ -35,7 +34,6 @@ class StockService(IStockService):
         """
         self.stocks_indices = self.constants_repo.get_stocks_indices()
         self.benchmark_index = self.constants_repo.get_by_key("Benchmark Index")
-        self.portfolio_size = int(self.constants_repo.get_by_key("Portfolio Size"))
         self.last_update_date = self.constants_repo.get_by_key("Last Update Date")
         self.append_to_clean_table = self.constants_repo.get_by_key("Append to Clean Table") == "True"
         self.market_holidays = [datetime.strptime(date_str, "%Y-%m-%d")
@@ -400,7 +398,7 @@ class StockService(IStockService):
             'metrics': metrics
         }
 
-    def build_portfolio(self, current_date: datetime):
+    def build_portfolio(self, current_date: datetime, portfolio_size):
         current_date = self.get_open_market_dates(current_date - timedelta(days=10), current_date)[-1]
         current_date_str = current_date.strftime("%Y-%m-%d")
 
@@ -416,14 +414,14 @@ class StockService(IStockService):
         all_forecast_details = sorted(all_forecast_details, key=lambda x: x['information_ratio'], reverse=True)
         # Build the portfolio with {self.portfolio_size} stocks with the highest information ratio
         for forecast_details in all_forecast_details:
-            if forecast_details['predicted_signal'] == 'Buy':
+            if forecast_details['predicted_signal'] == 'Buy' and forecast_details['information_ratio'] > 0:
                 portfolio_selected_stocks.append(forecast_details['stock_index'])
-            if len(portfolio_selected_stocks) == self.portfolio_size:
+            if len(portfolio_selected_stocks) == portfolio_size:
                 break
 
         return portfolio_selected_stocks
 
-    def test_performance(self, start_date: datetime, end_date: datetime):
+    def test_performance(self, start_date: datetime, end_date: datetime, portfolio_size):
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")
         print(
@@ -438,22 +436,34 @@ class StockService(IStockService):
         test_dates = self.get_open_market_dates(start_date, end_date)
         benchmark_returns = []
         portfolio_strategy_returns = []
+        equal_weights_returns = []
         selected_stocks_by_date = {}
         for test_date in test_dates:
             benchmark_returns.append(benchmark_df.loc[benchmark_df['date'] == test_date, 'return'].values[0])
 
-            selected_stocks = self.build_portfolio(test_date - timedelta(days=1))
+            selected_stocks = self.build_portfolio(test_date - timedelta(days=1), portfolio_size)
             selected_stocks_by_date[test_date.strftime("%Y-%m-%d")] = selected_stocks
+
             daily_portfolio_returns = []
-            for stock_index in selected_stocks:
+            daily_equal_weights_returns = []
+            for stock_index in self.stocks_indices:
                 stock_df = clean_df[clean_df['stock_index'] == stock_index].copy()
                 returns = stock_df['close'].pct_change(fill_method=None)
                 stock_df['return'] = returns
-                daily_portfolio_returns.append(stock_df.loc[stock_df['date'] == test_date, 'return'].values[0])
-
+                daily_return = stock_df.loc[stock_df['date'] == test_date, 'return'].values[0]
+                daily_equal_weights_returns.append(daily_return)
+                if stock_index not in selected_stocks:
+                    daily_portfolio_returns.append(daily_return)
+            equal_weights_returns.append(np.mean(daily_equal_weights_returns))
             portfolio_strategy_returns.append(np.mean(daily_portfolio_returns))
+        print(equal_weights_returns)
+        print(portfolio_strategy_returns)
+        print(benchmark_returns)
         benchmark_accumulative_returns = accumulative_returns(benchmark_returns)[-1]
         benchmark_information_ratio = information_ratio(benchmark_returns)
+        equal_weights_accumulative_returns = accumulative_returns(equal_weights_returns)[-1]
+        equal_weights_information_ratio_no_benchmark = information_ratio(equal_weights_returns)
+        equal_weights_information_ratio_with_benchmark = information_ratio(equal_weights_returns, benchmark_returns)
         portfolio_strategy_accumulative_returns = accumulative_returns(portfolio_strategy_returns)[-1]
         portfolio_strategy_information_ratio_no_benchmark = information_ratio(portfolio_strategy_returns)
         portfolio_strategy_information_ratio_with_benchmark = information_ratio(portfolio_strategy_returns,
@@ -463,7 +473,10 @@ class StockService(IStockService):
             'Benchmark': self.benchmark_index,
             'Benchmark Accumulative Returns': benchmark_accumulative_returns,
             'Benchmark Information Ratio': benchmark_information_ratio,
-            'Portfolio Strategy': selected_stocks_by_date,
+            'Equal Weights Accumulative Returns': equal_weights_accumulative_returns,
+            'Equal Weights Information Ratio (No Benchmark)': equal_weights_information_ratio_no_benchmark,
+            'Equal Weights Information Ratio (With Benchmark)': equal_weights_information_ratio_with_benchmark,
+            'Portfolio Strategy Selection': selected_stocks_by_date,
             'Portfolio Strategy Accumulative Returns': portfolio_strategy_accumulative_returns,
             'Portfolio Strategy Information Ratio (No Benchmark)': portfolio_strategy_information_ratio_no_benchmark,
             'Portfolio Strategy Information Ratio (With Benchmark)': portfolio_strategy_information_ratio_with_benchmark

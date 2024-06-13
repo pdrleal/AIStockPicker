@@ -35,6 +35,9 @@ class StockController(IStockController):
 
     def build_portfolio(self, request_args: dict):
         current_date = request_args.get('current_date')
+        portfolio_size = request_args.get('portfolio_size')
+        portfolio_size = int(portfolio_size) if portfolio_size is not None else 10
+
         if current_date is None:
             current_date = datetime.now()
         elif re.match(r"^\d{4}-\d{2}-\d{2}$", current_date) is not None:
@@ -42,11 +45,14 @@ class StockController(IStockController):
         else:
             return "Invalid date parameter. Date format must be yyyy-mm-dd.", 400
 
-        result = self.stock_service.build_portfolio(current_date)
+        result = self.stock_service.build_portfolio(current_date, portfolio_size)
         return Response(json.dumps(result, cls=EnhancedJSONEncoder), mimetype='application/json')
+
     def test_performance(self, request_args: dict):
         start_date = request_args.get('start_date')
         end_date = request_args.get('end_date')
+        portfolio_size = request_args.get('portfolio_size')
+        portfolio_size = int(portfolio_size) if portfolio_size is not None else 10
 
         if start_date is None or end_date is None:
             return "Missing 'start_date' or 'end_date' parameter", 400
@@ -55,6 +61,5 @@ class StockController(IStockController):
         # Convert string to datetime
         start_date = datetime.strptime(start_date, "%Y-%m-%d")
         end_date = datetime.strptime(end_date, "%Y-%m-%d")
-        result = self.stock_service.test_performance(start_date, end_date)
+        result = self.stock_service.test_performance(start_date, end_date, portfolio_size)
         return Response(json.dumps(result, cls=EnhancedJSONEncoder), mimetype='application/json')
-

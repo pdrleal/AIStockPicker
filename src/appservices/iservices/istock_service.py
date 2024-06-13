@@ -13,9 +13,9 @@ class IStockService(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def build_portfolio(self, current_date: datetime):
+    def build_portfolio(self, current_date: datetime, portfolio_size):
         pass
 
     @abc.abstractmethod
-    def test_performance(self, start_date: datetime, end_date: datetime):
+    def test_performance(self, start_date: datetime, end_date: datetime, portfolio_size):
         pass
